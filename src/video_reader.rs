@@ -17,7 +17,7 @@ pub struct VideoReader {
 impl VideoReader {
     pub fn new(file_name: String, target_w: u32, target_h: u32) -> Self {
         ffmpeg::init().unwrap();
-        if let Ok(mut ictx) = input(&file_name) {
+        if let Ok(ictx) = input(&file_name) {
             let input = ictx
                 .streams()
                 .best(Type::Video)
@@ -27,13 +27,13 @@ impl VideoReader {
 
             let context_decoder =
                 ffmpeg::codec::context::Context::from_parameters(input.parameters()).unwrap();
-            let mut decoder = context_decoder.decoder().video().unwrap();
+            let decoder = context_decoder.decoder().video().unwrap();
 
             let scaler = Context::get(
                 decoder.format(),
                 decoder.width(),
                 decoder.height(),
-                Pixel::RGB24,
+                Pixel::RGBA,
                 target_w,
                 target_h,
                 Flags::BILINEAR,

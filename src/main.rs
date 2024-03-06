@@ -30,7 +30,7 @@ fn main() -> Result<(), ffmpeg::Error> {
     let texture_creator = canvas.texture_creator();
 
     let mut reader1 = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/v1.mov".to_string(),
+        "/Users/sebastianpfluegelmeier/Movies/concrete.mov".to_string(),
         target_w,
         target_h,
     );
@@ -53,14 +53,13 @@ fn main() -> Result<(), ffmpeg::Error> {
 
     let mut frame_nr = 0;
     'mainloop: loop {
-        let rgb_frame1 = reader1.read_frame();
+        let base_frame = reader1.read_frame();
         let rgb_frame2 = reader2.read_frame();
         let rgb_frame3 = reader3.read_frame();
         let rgb_frame4 = reader4.read_frame();
-        let mut rgb_frame = match (frame_nr/4) % 4 {
-            0 => rgb_frame1,
-            1 => rgb_frame2,
-            2 => rgb_frame3,
+        let rgb_frame = match (frame_nr/4) % 3 {
+            0 => rgb_frame2,
+            1 => rgb_frame3,
             _ => rgb_frame4,
         };
         let empty = unsafe { rgb_frame.is_empty() };
@@ -68,20 +67,11 @@ fn main() -> Result<(), ffmpeg::Error> {
 
         if !empty {
             frame_nr += 1;
-            let stride = rgb_frame.stride(0);
+            let base_texture = frame_to_texture(base_frame, target_w, target_h, &texture_creator);
+            let mut texture = frame_to_texture(rgb_frame, target_w, target_h, &texture_creator);
+            texture.set_alpha_mod(100);
 
-            let data = rgb_frame.data_mut(0);
-
-            let surface = Surface::from_data(
-                data,
-                target_w,
-                target_h,
-                stride as u32,
-                PixelFormatEnum::RGB24,
-            )
-            .unwrap();
-            let texture = Texture::from_surface(&surface, &texture_creator).unwrap();
-
+            let _ = canvas.copy(&base_texture, None, None);
             let _ = canvas.copy(&texture, None, None);
             canvas.present();
         }
@@ -100,4 +90,21 @@ fn main() -> Result<(), ffmpeg::Error> {
         }
     }
     panic!();
+}
+
+fn frame_to_texture(mut rgb_frame: ffmpeg::frame::Video, target_w: u32, target_h: u32, texture_creator: &sdl2::render::TextureCreator<sdl2::video::WindowContext>) -> Texture<'_> {
+    let stride = rgb_frame.stride(0);
+
+    let data = rgb_frame.data_mut(0);
+
+    let surface = Surface::from_data(
+        data,
+        target_w,
+        target_h,
+        stride as u32,
+        PixelFormatEnum::RGBA32,
+    )
+    .unwrap();
+    let texture = Texture::from_surface(&surface, texture_creator).unwrap();
+    texture
 }
