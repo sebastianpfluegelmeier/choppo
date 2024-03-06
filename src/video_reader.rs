@@ -6,20 +6,17 @@ use ffmpeg::format::{input, Pixel};
 use ffmpeg::frame::Video;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling::{context::Context, flag::Flags};
-use sdl2::pixels::PixelFormatEnum;
-use sdl2::surface::Surface;
 
-struct VideoReader {
-    target_w: u32,
-    target_h: u32,
+pub struct VideoReader {
     scaler: Context,
-    input: Input,
-    video_stream_index: usize,
     decoder: Decoder,
+    video_stream_index: usize,
+    ictx: Input,
 }
 
 impl VideoReader {
-    fn new(file_name: String, target_w: u32, target_h: u32) -> Self {
+    pub fn new(file_name: String, target_w: u32, target_h: u32) -> Self {
+        ffmpeg::init().unwrap();
         if let Ok(mut ictx) = input(&file_name) {
             let input = ictx
                 .streams()
@@ -32,7 +29,7 @@ impl VideoReader {
                 ffmpeg::codec::context::Context::from_parameters(input.parameters()).unwrap();
             let mut decoder = context_decoder.decoder().video().unwrap();
 
-            let mut scaler = Context::get(
+            let scaler = Context::get(
                 decoder.format(),
                 decoder.width(),
                 decoder.height(),
@@ -42,25 +39,24 @@ impl VideoReader {
                 Flags::BILINEAR,
             )
             .unwrap();
-            for (stream, packet) in ictx.packets() {
-                if stream.index() == video_stream_index {
-                    decoder.send_packet(&packet).unwrap();
-                }
-            }
             return Self {
-                target_h,
-                target_w,
                 scaler,
-                input: ictx,
-                video_stream_index,
                 decoder,
+                video_stream_index,
+                ictx,
             };
         }
         panic!();
     }
 
-    fn read_frame(&mut self) -> Video {
+    pub fn read_frame(&mut self) -> Video {
         let mut decoded = Video::empty();
+        for (stream, packet) in self.ictx.packets() {
+            if stream.index() == self.video_stream_index {
+                self.decoder.send_packet(&packet).unwrap();
+                break;
+            }
+        }
         if self.decoder.receive_frame(&mut decoded).is_ok() {
             let mut rgb_frame = Video::empty();
             self.scaler.run(&decoded, &mut rgb_frame).unwrap();
