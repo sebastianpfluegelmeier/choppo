@@ -5,16 +5,11 @@ mod program;
 mod transformer;
 mod video_reader;
 
-use ffmpeg::format::{input, Pixel};
-use ffmpeg::media::Type;
-use ffmpeg::software::scaling::{context::Context, flag::Flags};
-use ffmpeg::util::frame::video::Video;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
-use std::env;
 use video_reader::VideoReader;
 
 fn main() -> Result<(), ffmpeg::Error> {
@@ -25,7 +20,7 @@ fn main() -> Result<(), ffmpeg::Error> {
     let target_h = 1080 / 2;
 
     let window = video_subsystem
-        .window("rust-sdl2 demo", target_w, target_h)
+        .window("visuals", target_w, target_h)
         .position_centered()
         .build()
         .unwrap();
@@ -34,35 +29,45 @@ fn main() -> Result<(), ffmpeg::Error> {
 
     let texture_creator = canvas.texture_creator();
 
-    let mut reader = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/Desktop/concrete_lowqual.mov".to_string(),
+    let mut reader1 = VideoReader::new(
+        "/Users/sebastianpfluegelmeier/v1.mov".to_string(),
+        target_w,
+        target_h,
+    );
+    let mut reader2 = VideoReader::new(
+        "/Users/sebastianpfluegelmeier/v2.mov".to_string(),
+        target_w,
+        target_h,
+    );
+    let mut reader3 = VideoReader::new(
+        "/Users/sebastianpfluegelmeier/v3.mov".to_string(),
+        target_w,
+        target_h,
+    );
+    let mut reader4 = VideoReader::new(
+        "/Users/sebastianpfluegelmeier/v4.mov".to_string(),
         target_w,
         target_h,
     );
 
-    let mut quit = false;
 
+    let mut frame_nr = 0;
     'mainloop: loop {
-        let mut rgb_frame = reader.read_frame();
+        let rgb_frame1 = reader1.read_frame();
+        let rgb_frame2 = reader2.read_frame();
+        let rgb_frame3 = reader3.read_frame();
+        let rgb_frame4 = reader4.read_frame();
+        let mut rgb_frame = match (frame_nr/4) % 4 {
+            0 => rgb_frame1,
+            1 => rgb_frame2,
+            2 => rgb_frame3,
+            _ => rgb_frame4,
+        };
         let empty = unsafe { rgb_frame.is_empty() };
 
-        for event in sdl_context.event_pump().unwrap().poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Option::Some(Keycode::Escape),
-                    ..
-                } => {
-                    quit = true;
-                }
-                _ => {}
-            }
-        }
-        if quit {
-            break 'mainloop;
-        }
 
         if !empty {
+            frame_nr += 1;
             let stride = rgb_frame.stride(0);
 
             let data = rgb_frame.data_mut(0);
@@ -80,21 +85,19 @@ fn main() -> Result<(), ffmpeg::Error> {
             let _ = canvas.copy(&texture, None, None);
             canvas.present();
         }
-    }
-    panic!();
-}
 
-fn break_on_quit(event_pump: &mut sdl2::EventPump, quit_next_frame: &mut bool) {
-    for event in event_pump.poll_iter() {
-        match event {
-            Event::Quit { .. }
-            | Event::KeyDown {
-                keycode: Some(Keycode::Escape),
-                ..
-            } => {
-                *quit_next_frame = true;
+        for event in sdl_context.event_pump().unwrap().poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Option::Some(Keycode::Escape),
+                    ..
+                } => {
+                    break 'mainloop;
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
+    panic!();
 }
