@@ -3,6 +3,7 @@ extern crate ffmpeg_next as ffmpeg;
 mod output_instructions;
 mod program;
 mod transformer;
+mod video_reader;
 
 use ffmpeg::format::{input, Pixel};
 use ffmpeg::media::Type;
@@ -10,8 +11,7 @@ use ffmpeg::software::scaling::{context::Context, flag::Flags};
 use ffmpeg::util::frame::video::Video;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::{Color, PixelFormatEnum};
-use sdl2::rect::{Point, Rect};
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use std::env;
@@ -43,7 +43,6 @@ fn main() -> Result<(), ffmpeg::Error> {
         )?;
          
 
-        let mut frame_index = 0;
 
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
@@ -83,7 +82,6 @@ fn main() -> Result<(), ffmpeg::Error> {
 
                     let _ = canvas.copy(&texture, None, None);
                     canvas.present();
-                    frame_index += 1;
                 }
                 Ok(())
             };
