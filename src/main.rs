@@ -1,6 +1,7 @@
 extern crate ffmpeg_next as ffmpeg;
 
 mod output_instructions;
+mod parser;
 mod program;
 mod transformer;
 mod video_reader;
@@ -10,89 +11,147 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
+use std::{
+    sync::mpsc::{channel, Receiver, Sender},
+    time::{Duration, Instant},
+};
 use video_reader::VideoReader;
 
+use crate::parser::*;
+
 fn main() -> Result<(), ffmpeg::Error> {
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
+    let input = "
+        directory='~/clips';
+        extension='.mp4';
+        clip thirdclip = 'thirdclip';
+        multi mlt = 'thirdclip';
+        clip abc = 'thisclip' | 'otherclip'[4:3] | thirdclip;
+        beat b = .-..-..-;
+        beat d = b;
+        clip d = .--.--.@mlt;
+        beat c = .--.- | 3233232;
+        'd'
+    ";
+    let result = parse_main(input);
 
-    let target_w = 1920 / 2;
-    let target_h = 1080 / 2;
+    println!("{:?}", result);
 
-    let window = video_subsystem
-        .window("visuals", target_w, target_h)
-        .position_centered()
-        .build()
-        .unwrap();
+    return Ok(());
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    // let sdl_context = sdl2::init().unwrap();
+    // let video_subsystem = sdl_context.video().unwrap();
 
-    let texture_creator = canvas.texture_creator();
+    // let target_w = 1920 / 2;
+    // let target_h = 1080 / 2;
 
-    let mut reader1 = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/Movies/concrete.mov".to_string(),
-        target_w,
-        target_h,
-    );
-    let mut reader2 = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/v2.mov".to_string(),
-        target_w,
-        target_h,
-    );
-    let mut reader3 = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/v3.mov".to_string(),
-        target_w,
-        target_h,
-    );
-    let mut reader4 = VideoReader::new(
-        "/Users/sebastianpfluegelmeier/v4.mov".to_string(),
-        target_w,
-        target_h,
-    );
+    // let window = video_subsystem
+    // .window("visuals", target_w, target_h)
+    // .position_centered()
+    // .build()
+    // .unwrap();
 
+    // let mut canvas = window.into_canvas().build().unwrap();
 
-    let mut frame_nr = 0;
-    'mainloop: loop {
-        let base_frame = reader1.read_frame();
-        let rgb_frame2 = reader2.read_frame();
-        let rgb_frame3 = reader3.read_frame();
-        let rgb_frame4 = reader4.read_frame();
-        let rgb_frame = match (frame_nr/4) % 3 {
-            0 => rgb_frame2,
-            1 => rgb_frame3,
-            _ => rgb_frame4,
-        };
-        let empty = unsafe { rgb_frame.is_empty() };
+    // let texture_creator = canvas.texture_creator();
+    // let files = vec![
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // "/Users/sebastianpfluegelmeier/v1.mov",
+    // "/Users/sebastianpfluegelmeier/v2.mov",
+    // "/Users/sebastianpfluegelmeier/v3.mov",
+    // "/Users/sebastianpfluegelmeier/v4.mov",
+    // ];
+    // let mut readers: Vec<VideoReader> = files.iter().map(|f| VideoReader::new(f.to_string(), target_w, target_h)).collect();
 
+    // let mut frame_nr = 0;
 
-        if !empty {
-            frame_nr += 1;
-            let base_texture = frame_to_texture(base_frame, target_w, target_h, &texture_creator);
-            let mut texture = frame_to_texture(rgb_frame, target_w, target_h, &texture_creator);
-            texture.set_alpha_mod(100);
+    // const FPS: u32 = 60;
+    // let frame_duration: Duration = Duration::from_secs(1) / FPS;
 
-            let _ = canvas.copy(&base_texture, None, None);
-            let _ = canvas.copy(&texture, None, None);
-            canvas.present();
-        }
+    // let mut previous_frame_time = Instant::now();
 
-        for event in sdl_context.event_pump().unwrap().poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Option::Some(Keycode::Escape),
-                    ..
-                } => {
-                    break 'mainloop;
-                }
-                _ => {}
-            }
-        }
-    }
-    panic!();
+    // 'mainloop: loop {
+    // let base_frame = readers[0].read_frame();
+    // let rgb_frame2 = readers[1].read_frame();
+    // let rgb_frame3 = readers[2].read_frame();
+    // let rgb_frame4 = readers[3].read_frame();
+    // let rgb_frame = match (frame_nr / 4) % 3 {
+    // 0 => rgb_frame2,
+    // 1 => rgb_frame3,
+    // _ => rgb_frame4,
+    // };
+
+    // if let (Some(base_frame), Some(rgb_frame)) = (base_frame, rgb_frame) {
+    // frame_nr += 1;
+    // let base_texture = frame_to_texture(base_frame, target_w, target_h, &texture_creator);
+    // let mut texture = frame_to_texture(rgb_frame, target_w, target_h, &texture_creator);
+    // texture.set_alpha_mod(100);
+
+    // let _ = canvas.copy(&base_texture, None, None);
+    // let _ = canvas.copy(&texture, None, None);
+    // canvas.present();
+    // } else {
+    // break 'mainloop;
+    // }
+
+    // for event in sdl_context.event_pump().unwrap().poll_iter() {
+    // match event {
+    // Event::Quit { .. }
+    // | Event::KeyDown {
+    // keycode: Option::Some(Keycode::Escape),
+    // ..
+    // } => {
+    // break 'mainloop;
+    // }
+    // _ => {}
+    // }
+    // }
+
+    // let elapsed_frame_time = previous_frame_time.elapsed();
+    // if elapsed_frame_time < frame_duration {
+    // std::thread::sleep(frame_duration - elapsed_frame_time);
+    // }
+    // previous_frame_time = Instant::now();
+    // }
+    // 'bloop: loop {
+    // for event in sdl_context.event_pump().unwrap().poll_iter() {
+    // match event {
+    // Event::Quit { .. }
+    // | Event::KeyDown {
+    // keycode: Option::Some(Keycode::Escape),
+    // ..
+    // } => { break 'bloop}
+    // _ => {}
+    // }
+    // }
+    // }
+    // panic!();
 }
 
-fn frame_to_texture(mut rgb_frame: ffmpeg::frame::Video, target_w: u32, target_h: u32, texture_creator: &sdl2::render::TextureCreator<sdl2::video::WindowContext>) -> Texture<'_> {
+fn frame_to_texture(
+    mut rgb_frame: ffmpeg::frame::Video,
+    target_w: u32,
+    target_h: u32,
+    texture_creator: &sdl2::render::TextureCreator<sdl2::video::WindowContext>,
+) -> Texture<'_> {
     let stride = rgb_frame.stride(0);
 
     let data = rgb_frame.data_mut(0);

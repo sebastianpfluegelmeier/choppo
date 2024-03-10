@@ -1,7 +1,10 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use ffmpeg::codec::decoder::Video as Decoder;
-use ffmpeg::format::context::Input;
+use std::collections::VecDeque;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
+use std::time::Duration;
+
 use ffmpeg::format::{input, Pixel};
 use ffmpeg::frame::Video;
 use ffmpeg::media::Type;
@@ -9,15 +12,16 @@ use ffmpeg::software::scaling::{context::Context, flag::Flags};
 
 pub struct VideoReader {
     scaler: Context,
-    decoder: Decoder,
-    video_stream_index: usize,
-    ictx: Input,
+    buffer: VecDeque<Video>,
+    receiver: Receiver<Video>,
+    sender: Sender<usize>,
+    frame: usize,
 }
 
 impl VideoReader {
     pub fn new(file_name: String, target_w: u32, target_h: u32) -> Self {
         ffmpeg::init().unwrap();
-        if let Ok(ictx) = input(&file_name) {
+        if let Ok(mut ictx) = input(&file_name) {
             let input = ictx
                 .streams()
                 .best(Type::Video)
@@ -27,7 +31,7 @@ impl VideoReader {
 
             let context_decoder =
                 ffmpeg::codec::context::Context::from_parameters(input.parameters()).unwrap();
-            let decoder = context_decoder.decoder().video().unwrap();
+            let mut decoder = context_decoder.decoder().video().unwrap();
 
             let scaler = Context::get(
                 decoder.format(),
@@ -39,30 +43,57 @@ impl VideoReader {
                 Flags::BILINEAR,
             )
             .unwrap();
+            let (frame_sender, frame_receiver) = channel();
+            let (buffer_size_sender, buffer_siz_receiver) = channel();
+            let mut buffer_size = 0;
+            thread::spawn(move || loop {
+                for (stream, packet) in ictx.packets() {
+                    if stream.index() == video_stream_index {
+                        decoder.send_packet(&packet).unwrap();
+                        break;
+                    }
+                }
+                let mut decoded = Video::empty();
+                if decoder.receive_frame(&mut decoded).is_ok() {
+                    'inner: loop {
+                        if let Result::Ok(bs) = buffer_siz_receiver.recv_timeout(Duration::from_millis(1)) {
+                            buffer_size = bs;
+                        };
+                        if buffer_size < 5 {
+                            break 'inner;
+                        }
+                    }
+                    let _ = frame_sender.send(decoded);
+                    buffer_size += 1;
+                }
+            });
             return Self {
                 scaler,
-                decoder,
-                video_stream_index,
-                ictx,
+                sender: buffer_size_sender,
+                receiver: frame_receiver,
+                buffer: VecDeque::new(),
+                frame: 0,
             };
         }
+
         panic!();
     }
 
-    pub fn read_frame(&mut self) -> Video {
-        let mut decoded = Video::empty();
-        for (stream, packet) in self.ictx.packets() {
-            if stream.index() == self.video_stream_index {
-                self.decoder.send_packet(&packet).unwrap();
-                break;
-            }
+    pub fn read_frame(&mut self) -> Option<Video> {
+        let _ = self.sender.send(self.buffer.len());
+        for video in self.receiver.try_iter() {
+            self.buffer.push_front(video);
+            let _ = self.sender.send(self.buffer.len());
         }
-        if self.decoder.receive_frame(&mut decoded).is_ok() {
+        if !self.buffer.is_empty() {
             let mut rgb_frame = Video::empty();
-            self.scaler.run(&decoded, &mut rgb_frame).unwrap();
-
-            return rgb_frame;
+            self.scaler
+                .run(&self.buffer.pop_back().unwrap(), &mut rgb_frame)
+                .unwrap();
+            self.frame += 1;
+            Some(rgb_frame)
+        } else {
+            None
         }
-        return Video::empty();
     }
 }
