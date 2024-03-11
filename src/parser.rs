@@ -37,7 +37,7 @@ pub fn parse_directory_declaration(input: &str) -> IResult<&str, DirectoryDeclar
 
 #[derive(Debug)]
 pub struct ExtensionDeclaration {
-    pub directory: String,
+    pub extension: String,
 }
 
 pub fn parse_extension_declaration(input: &str) -> IResult<&str, ExtensionDeclaration> {
@@ -57,7 +57,7 @@ pub fn parse_extension_declaration(input: &str) -> IResult<&str, ExtensionDeclar
     Ok((
         input,
         ExtensionDeclaration {
-            directory: directory.into(),
+            extension: directory.into(),
         },
     ))
 }
@@ -65,7 +65,6 @@ pub fn parse_extension_declaration(input: &str) -> IResult<&str, ExtensionDeclar
 #[derive(Debug)]
 pub enum Declaration {
     ClipDeclaration(ClipDeclaration),
-    MultiDeclaration(MultiDeclaration),
     BeatDeclaration(BeatDeclaration),
 }
 
@@ -73,7 +72,6 @@ pub fn parse_declaration(input: &str) -> IResult<&str, Declaration> {
     let (rest_input, input) = take_until(";")(input)?;
     let (input, declaration) = alt((
         parse_clip_declaration,
-        parse_multi_declaration,
         parse_beat_declaration,
     ))(input)?;
     let (input, _) = multispace0(input)?;
@@ -187,23 +185,23 @@ pub fn parse_number_beat(input: &str) -> IResult<&str, usize> {
 
 #[derive(Debug, Clone)]
 pub struct DotBeatExpression {
-    beats: Vec<bool>,
+    pub beats: Vec<bool>,
 }
 
 #[derive(Debug, Clone)]
 pub struct NumberBeatExpression {
-    beats: Vec<usize>,
+    pub beats: Vec<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub struct BeatChainExpression {
-    beat_a: Box<BeatExpression>,
-    beat_b: Box<BeatExpression>,
+    pub beat_a: Box<BeatExpression>,
+    pub beat_b: Box<BeatExpression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ReferenceBeatExpression {
-    name: String,
+    pub name: String,
 }
 
 pub fn parse_reference_beat_expression(input: &str) -> IResult<&str, BeatExpression> {
@@ -265,37 +263,12 @@ pub fn parse_clip_declaration(input: &str) -> IResult<&str, Declaration> {
     ))
 }
 
-#[derive(Debug)]
-pub struct MultiDeclaration {
-    pub expression: ClipExpression,
-    pub name: String,
-}
-
-pub fn parse_multi_declaration(input: &str) -> IResult<&str, Declaration> {
-    let (input, _) = multispace0(input)?;
-    let (input, _) = alt((tag("multi"), tag("mlt")))(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, name) = alpha1(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = char('=')(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, expression) = parse_raw_video_expression(input)?;
-    let (input, _) = multispace0(input)?;
-
-    Ok((
-        input,
-        Declaration::MultiDeclaration(MultiDeclaration {
-            expression,
-            name: name.into(),
-        }),
-    ))
-}
-
 #[derive(Debug, Clone)]
 pub enum ClipExpression {
     Chain(ClipChainExpression),
     Truncated(TruncatedClipExpression),
     RawVideo(RawVideoExpression),
+    MultiVideo(MultiVideoExpression),
     Reference(ReferenceClipExpression),
     ApplyBeat(ApplyBeatExpression),
 }
@@ -305,6 +278,7 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
         parse_clip_chain_expression,
         parse_truncated_clip_expression,
         parse_raw_video_expression,
+        parse_multi_video_expression,
         parse_reference_clip_expression,
         parse_apply_beat_expression,
     ))(input)
@@ -312,8 +286,8 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
 
 #[derive(Debug, Clone)]
 pub struct ApplyBeatExpression {
-    beat_expression: BeatExpression,
-    clip_expression: Box<ClipExpression>,
+    pub beat_expression: BeatExpression,
+    pub clip_expression: Box<ClipExpression>,
 }
 
 pub fn parse_apply_beat_expression(input: &str) -> IResult<&str, ClipExpression> {
@@ -378,8 +352,8 @@ pub fn parse_clip_chain_expression(input: &str) -> IResult<&str, ClipExpression>
 
 #[derive(Debug, Clone)]
 pub struct TruncatedClipExpression {
-    clip: Box<ClipExpression>,
-    timerange: TimeRangeExpression,
+    pub clip: Box<ClipExpression>,
+    pub timerange: TimeRangeExpression,
 }
 pub fn parse_truncated_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
     if !input.contains("[") && !input.contains(":") && !input.contains("]") {
@@ -446,6 +420,27 @@ fn parse_time_sixteenth_expression(input: &str) -> IResult<&str, usize> {
     Ok((input, sixteenth))
 }
 
+
+#[derive(Debug, Clone)]
+pub struct MultiVideoExpression {
+    pub filename: String,
+}
+pub fn parse_multi_video_expression(input: &str) -> IResult<&str, ClipExpression> {
+    let (input, _) = multispace0(input)?;
+    let (input, _) = tag("multi")(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, filename) = alt((
+        delimited(char('\''), recognize(take_until("'")), char('\'')),
+        delimited(char('"'), recognize(take_until("\"")), char('"')),
+    ))(input)?;
+    let (input, _) = multispace0(input)?;
+    Ok((
+        input,
+        ClipExpression::RawVideo(RawVideoExpression {
+            filename: filename.into(),
+        }),
+    ))
+}
 #[derive(Debug, Clone)]
 pub struct RawVideoExpression {
     pub filename: String,
@@ -467,11 +462,12 @@ pub fn parse_raw_video_expression(input: &str) -> IResult<&str, ClipExpression> 
 
 #[derive(Debug)]
 pub struct Main {
-    directory_declaration: DirectoryDeclaration,
-    extension_declaration: ExtensionDeclaration,
-    declarations: Vec<Declaration>,
-    main_expression: ClipExpression,
+    pub directory_declaration: DirectoryDeclaration,
+    pub extension_declaration: ExtensionDeclaration,
+    pub declarations: Vec<Declaration>,
+    pub main_expression: ClipExpression,
 }
+
 pub fn parse_main(input: &str) -> IResult<&str, Main> {
     let (input, _) = multispace0(input)?;
     let (input, directory_declaration) = parse_directory_declaration(input)?;
