@@ -1,29 +1,29 @@
 extern crate ffmpeg_next as ffmpeg;
 
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::render::Texture;
+use sdl2::surface::Surface;
+use crate::{interpreter::interpret, parser::parse_main};
+
 mod output_instructions;
 mod parser;
 mod program;
 mod transformer;
 mod video_reader;
 mod interpreter;
+mod util;
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::pixels::PixelFormatEnum;
-use sdl2::render::Texture;
-use sdl2::surface::Surface;
-use std::time::{Duration, Instant};
-use video_reader::VideoReader;
 
-use crate::{interpreter::interpret, parser::parse_main};
 
 fn main() -> Result<(), ffmpeg::Error> {
     let input = "
         directory = 'dir';
         extension = '.mov';
+        clip a = 'a'[0:1] | 'b';
         beat a = .-..-..-;
         beat b = 332;
         beat c = a | b;
+        beat INLINECOMBI = 224|.---;
         'vid'
     ";
 
