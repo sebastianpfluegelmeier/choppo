@@ -356,7 +356,7 @@ pub struct TruncatedClipExpression {
     pub timerange: TimeRangeExpression,
 }
 pub fn parse_truncated_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
-    if !input.contains("[") && !input.contains(":") && !input.contains("]") {
+    if !input.contains("[") && !input.contains("]") {
         return fail(input);
     }
     let (input, _) = multispace0(input)?;

@@ -19,7 +19,7 @@ fn main() -> Result<(), ffmpeg::Error> {
     let input = "
         directory = 'dir';
         extension = '.mov';
-        clip a = 'a'[0:1] | 'b';
+        clip a = 'x'[3:4];
         beat a = .-..-..-;
         beat b = 332;
         beat c = a | b;

@@ -52,7 +52,7 @@ pub fn interpret(input: Main) -> InterpretedClip {
             interpreted_clips.insert(name.clone(), result);
             return interpreted_clips;
         });
-        println!("{:?}", clips_interpreted);
+    println!("{:?}", clips_interpreted);
     // this is bs probably but maybe good as reference
 
     InterpretedClip {
@@ -96,7 +96,7 @@ fn interpret_clip_expression(
             for command in &mut clip.commands {
                 command.0 = &command.0 - &from;
                 match &command.1 {
-                    ClipCommand::PlayClip(_) => {}
+                    ClipCommand::PlayClip(_) => {} // TODO: something fishy here hmmmmmm
                     ClipCommand::PlayClipFrom(path, time) => {
                         command.1 = ClipCommand::PlayClipFrom(path.clone(), time - &from)
                     }
@@ -124,16 +124,19 @@ fn interpret_clip_expression(
             interpreted_clips,
         ),
         ClipExpression::MultiVideo(_) => todo!(),
-        ClipExpression::Reference(ReferenceClipExpression { name }) => (
-            InterpretedClip {
-                commands: vec![(
-                    Time { num: 0, denom: 1 },
-                    ClipCommand::PlayClip(name.clone()),
-                )],
-                length: Time { num: 1, denom: 1 },
-            },
-            interpreted_clips,
-        ),
+        ClipExpression::Reference(ReferenceClipExpression { name }) => {
+            if let Some(clip) = interpreted_clips.get(name) {
+                (clip.clone(), interpreted_clips)
+            } else {
+                let (clip, mut interpreted_clips) = interpret_clip_expression(
+                    &all_clip_expressions[name],
+                    all_clip_expressions.clone(),
+                    interpreted_clips,
+                );
+                interpreted_clips.insert(name.clone(), clip.clone());
+                (clip, interpreted_clips)
+            }
+        }
         ClipExpression::ApplyBeat(_) => todo!(),
     }
 }
@@ -261,7 +264,6 @@ fn interpret_number_beat_expression(expression: &NumberBeatExpression) -> Interp
         },
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct InterpretedClip {
