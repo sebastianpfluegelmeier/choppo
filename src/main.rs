@@ -1,125 +1,104 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use sdl2::pixels::PixelFormatEnum;
+use std::time::{Duration, Instant};
+
+use crate::video_loader::VideoLoader;
+use crate::video_runner::VideoRunner;
+use crate::{interpreter::interpret, parser::parse_main, video_reader::VideoReader};
+use sdl2::keyboard::Keycode;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
-use crate::{interpreter::interpret, parser::parse_main};
+use sdl2::{event::Event, pixels::PixelFormatEnum};
 
-mod output_instructions;
+mod interpreter;
 mod parser;
 mod program;
-mod transformer;
-mod video_reader;
-mod interpreter;
 mod util;
-
-
+mod video_loader;
+mod video_reader;
+mod video_runner;
 
 fn main() -> Result<(), ffmpeg::Error> {
     let input = "
-        directory = 'dir';
-        extension = '.mov';
-        clip a = 'x'[3:4];
-        beat a = .-..-..-;
-        beat b = 332;
-        beat c = a | b;
-        beat INLINECOMBI = 224|.---;
-        'vid'
+        directory = '/Users/sebastianpfluegelmeier/test/';
+        extension = '.mp4';
+        clip a = 'a'[1.1:1.3] | 'b';
+        a[:4]
     ";
 
     let parsed = parse_main(input).unwrap().1;
-    // println!("parsed {:?}", parsed);
-    interpret(parsed);
-    todo!()
-    // let sdl_context = sdl2::init().unwrap();
-    // let video_subsystem = sdl_context.video().unwrap();
+    println!("{:?}", parsed);
+    let path = parsed.directory_declaration.directory.clone();
+    let extension = parsed.extension_declaration.extension.clone();
+    let interpreted = interpret(parsed);
+    println!("interpreted {:?}", interpreted);
+    let mut runner = VideoRunner::new(60.0, 120.0, interpreted.commands,interpreted.length.into());
 
-    // let target_w = 1920 / 2;
-    // let target_h = 1080 / 2;
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
 
-    // let window = video_subsystem
-    //     .window("visuals", target_w, target_h)
-    //     .position_centered()
-    //     .build()
-    //     .unwrap();
+    let target_w = 1920 / 2;
+    let target_h = 1080 / 2;
 
-    // let mut canvas = window.into_canvas().build().unwrap();
+    let window = video_subsystem
+        .window("visuals", target_w, target_h)
+        .position_centered()
+        .build()
+        .unwrap();
 
-    // let texture_creator = canvas.texture_creator();
-    // let files = vec![
-    //     "/Users/sebastianpfluegelmeier/v1.mov",
-    //     "/Users/sebastianpfluegelmeier/v2.mov",
-    //     "/Users/sebastianpfluegelmeier/v3.mov",
-    //     "/Users/sebastianpfluegelmeier/v4.mov",
-    // ];
-    // let mut readers: Vec<VideoReader> = files
-    //     .iter()
-    //     .map(|f| VideoReader::new(f.to_string(), target_w, target_h))
-    //     .collect();
+    let mut canvas = window.into_canvas().build().unwrap();
 
-    // let mut frame_nr = 0;
+    let texture_creator = canvas.texture_creator();
+    let mut video_loader = VideoLoader::new(target_w, target_h);
+    let mut previous_frame_time = Instant::now();
+    let frame_duration = Duration::from_secs_f64(1.0 / 60.0);
+    'mainloop: loop {
+        let cmd = runner.advance_time(1.0 / 60.0);
+        let video = match cmd {
+            video_runner::FrameCommand::ShowSingleFrame { file, frame } => {
+                video_loader.load(&format!("{}{}{}", &path, &file, &extension), frame)
+            }
+        };
 
-    // const FPS: u32 = 60;
-    // let frame_duration: Duration = Duration::from_secs(1) / FPS;
+        if let Some(video) = video {
+            let texture = frame_to_texture(video, target_w, target_h, &texture_creator);
 
-    // let mut previous_frame_time = Instant::now();
+            let _ = canvas.copy(&texture, None, None);
+        }
+        canvas.present();
 
-    // 'mainloop: loop {
-    //     let base_frame = readers[0].read_frame();
-    //     let rgb_frame2 = readers[1].read_frame();
-    //     let rgb_frame3 = readers[2].read_frame();
-    //     let rgb_frame4 = readers[3].read_frame();
-    //     let rgb_frame = match (frame_nr / 4) % 3 {
-    //         0 => rgb_frame2,
-    //         1 => rgb_frame3,
-    //         _ => rgb_frame4,
-    //     };
+        for event in sdl_context.event_pump().unwrap().poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Option::Some(Keycode::Escape),
+                    ..
+                } => {
+                    break 'mainloop;
+                }
+                _ => {}
+            }
+        }
 
-    //     if let (Some(base_frame), Some(rgb_frame)) = (base_frame, rgb_frame) {
-    //         frame_nr += 1;
-    //         let base_texture = frame_to_texture(base_frame, target_w, target_h, &texture_creator);
-    //         let mut texture = frame_to_texture(rgb_frame, target_w, target_h, &texture_creator);
-    //         texture.set_alpha_mod(100);
-
-    //         let _ = canvas.copy(&base_texture, None, None);
-    //         let _ = canvas.copy(&texture, None, None);
-    //         canvas.present();
-    //     } else {
-    //         break 'mainloop;
-    //     }
-
-    //     for event in sdl_context.event_pump().unwrap().poll_iter() {
-    //         match event {
-    //             Event::Quit { .. }
-    //             | Event::KeyDown {
-    //                 keycode: Option::Some(Keycode::Escape),
-    //                 ..
-    //             } => {
-    //                 break 'mainloop;
-    //             }
-    //             _ => {}
-    //         }
-    //     }
-
-    //     let elapsed_frame_time = previous_frame_time.elapsed();
-    //     if elapsed_frame_time < frame_duration {
-    //         std::thread::sleep(frame_duration - elapsed_frame_time);
-    //     }
-    //     previous_frame_time = Instant::now();
-    // }
-    // 'bloop: loop {
-    //     for event in sdl_context.event_pump().unwrap().poll_iter() {
-    //         match event {
-    //             Event::Quit { .. }
-    //             | Event::KeyDown {
-    //                 keycode: Option::Some(Keycode::Escape),
-    //                 ..
-    //             } => break 'bloop,
-    //             _ => {}
-    //         }
-    //     }
-    // }
-    // panic!();
+        let elapsed_frame_time = previous_frame_time.elapsed();
+        if elapsed_frame_time < frame_duration {
+            std::thread::sleep(frame_duration - elapsed_frame_time);
+        }
+        previous_frame_time = Instant::now();
+    }
+    'bloop: loop {
+        for event in sdl_context.event_pump().unwrap().poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Option::Some(Keycode::Escape),
+                    ..
+                } => break 'bloop,
+                _ => {}
+            }
+        }
+    }
+    panic!();
 }
 
 fn frame_to_texture(

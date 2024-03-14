@@ -4,6 +4,7 @@ use std::{
 };
 
 use ffmpeg::time;
+use fraction::Fraction;
 
 use crate::{
     parser::{
@@ -15,8 +16,6 @@ use crate::{
 };
 
 pub fn interpret(input: Main) -> InterpretedClip {
-    let directory = input.directory_declaration.directory;
-    let extension = input.extension_declaration.extension;
     let beats: HashMap<String, BeatExpression> = input
         .declarations
         .iter()
@@ -52,13 +51,7 @@ pub fn interpret(input: Main) -> InterpretedClip {
             interpreted_clips.insert(name.clone(), result);
             return interpreted_clips;
         });
-    println!("{:?}", clips_interpreted);
-    // this is bs probably but maybe good as reference
-
-    InterpretedClip {
-        commands: Vec::new(),
-        length: Time { num: 0, denom: 0 },
-    }
+    interpret_clip_expression(&input.main_expression, clips, clips_interpreted).0
 }
 
 fn interpret_clip_expression(
@@ -95,11 +88,16 @@ fn interpret_clip_expression(
             }));
             for command in &mut clip.commands {
                 command.0 = &command.0 - &from;
-                match &command.1 {
-                    ClipCommand::PlayClip(_) => {} // TODO: something fishy here hmmmmmm
-                    ClipCommand::PlayClipFrom(path, time) => {
-                        command.1 = ClipCommand::PlayClipFrom(path.clone(), time - &from)
-                    }
+                if time_to_frac(&command.0) < Fraction::new(0_u64, 1_u64) {
+                    match &command.1 {
+                        ClipCommand::PlayClip(path) => {
+                            command.1 = ClipCommand::PlayClipFrom(path.clone(), from.clone())
+                        }
+                        ClipCommand::PlayClipFrom(path, time) => {
+                            command.1 = ClipCommand::PlayClipFrom(path.clone(), time + &from)
+                        }
+                    };
+                    command.0 = Time { num: 0, denom: 1 };
                 }
             }
             if let Some(to) = &timerange.to {
@@ -165,9 +163,7 @@ fn interpret_beat_expression(
 }
 
 fn order_beat(mut input: InterpretedBeat) -> InterpretedBeat {
-    input
-        .beats
-        .sort_by_key(|t| ((t.num as f64 / t.denom as f64) * 100000.0) as usize);
+    input.beats.sort_unstable_by_key(time_to_frac);
     input
 }
 
@@ -287,6 +283,12 @@ pub struct InterpretedBeat {
 pub struct Time {
     pub num: usize,
     pub denom: usize,
+}
+
+impl Into<f64> for Time {
+    fn into(self) -> f64 {
+        self.num as f64 / self.denom as f64
+    }
 }
 
 impl Sub for &Time {

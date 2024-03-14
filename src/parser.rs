@@ -70,10 +70,7 @@ pub enum Declaration {
 
 pub fn parse_declaration(input: &str) -> IResult<&str, Declaration> {
     let (rest_input, input) = take_until(";")(input)?;
-    let (input, declaration) = alt((
-        parse_clip_declaration,
-        parse_beat_declaration,
-    ))(input)?;
+    let (input, declaration) = alt((parse_clip_declaration, parse_beat_declaration))(input)?;
     let (input, _) = multispace0(input)?;
     if !input.is_empty() {
         return fail(input);
@@ -407,7 +404,13 @@ fn parse_time_expression(input: &str) -> IResult<&str, TimeExpression> {
     let (input, sixteenth) = opt(parse_time_sixteenth_expression)(input)?;
     let (input, _) = multispace0(input)?;
 
-    Ok((input, TimeExpression { beat, sixteenth }))
+    Ok((
+        input,
+        TimeExpression {
+            beat: (beat as isize - 1).max(0) as usize,
+            sixteenth: sixteenth.map(|b| (b as isize - 1).max(0) as usize),
+        },
+    ))
 }
 
 fn parse_time_sixteenth_expression(input: &str) -> IResult<&str, usize> {
@@ -419,7 +422,6 @@ fn parse_time_sixteenth_expression(input: &str) -> IResult<&str, usize> {
         .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char)))?;
     Ok((input, sixteenth))
 }
-
 
 #[derive(Debug, Clone)]
 pub struct MultiVideoExpression {
