@@ -88,10 +88,16 @@ fn interpret_clip_expression(
             }));
             for command in &mut clip.commands {
                 command.0 = &command.0 - &from;
-                if time_to_frac(&command.0) < Fraction::new(0_u64, 1_u64) {
+                if command.0.num < 0 {
                     match &command.1 {
                         ClipCommand::PlayClip(path) => {
-                            command.1 = ClipCommand::PlayClipFrom(path.clone(), from.clone())
+                            command.1 = ClipCommand::PlayClipFrom(
+                                path.clone(),
+                                Time {
+                                    num: -command.0.num,
+                                    denom: command.0.denom,
+                                },
+                            )
                         }
                         ClipCommand::PlayClipFrom(path, time) => {
                             command.1 = ClipCommand::PlayClipFrom(path.clone(), time + &from)
@@ -220,7 +226,7 @@ fn interpret_dot_beat_expression(expression: &DotBeatExpression) -> InterpretedB
         .enumerate()
         .filter_map(|(index, beat_on)| {
             let time = Time {
-                num: index + 1,
+                num: (index + 1) as isize,
                 denom: 16,
             };
             if *beat_on {
@@ -233,7 +239,7 @@ fn interpret_dot_beat_expression(expression: &DotBeatExpression) -> InterpretedB
     InterpretedBeat {
         beats,
         length: Time {
-            num: expression.beats.len(),
+            num: expression.beats.len() as isize,
             denom: 16,
         },
     }
@@ -250,7 +256,7 @@ fn interpret_number_beat_expression(expression: &NumberBeatExpression) -> Interp
                     denom: 16,
                 };
                 beats.push(new_beat);
-                (current_position + beat, beats)
+                (current_position + *beat as isize, beats)
             });
     InterpretedBeat {
         beats,
@@ -281,7 +287,7 @@ pub struct InterpretedBeat {
 
 #[derive(Clone, Debug)]
 pub struct Time {
-    pub num: usize,
+    pub num: isize,
     pub denom: usize,
 }
 

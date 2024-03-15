@@ -1,0 +1,6 @@
+directory = '/Users/sebastianpfluegelmeier/test/';
+extension = '.mp4';
+
+clip x = 'a'[4:4.2];
+clip r = x | x | x | x;
+r | 'b'

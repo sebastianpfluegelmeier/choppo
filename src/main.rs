@@ -2,6 +2,7 @@ extern crate ffmpeg_next as ffmpeg;
 
 use std::time::{Duration, Instant};
 
+use crate::source_watcher::SourceWatcher;
 use crate::video_loader::VideoLoader;
 use crate::video_runner::VideoRunner;
 use crate::{interpreter::interpret, parser::parse_main, video_reader::VideoReader};
@@ -9,30 +10,29 @@ use sdl2::keyboard::Keycode;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
+use std::env;
+use std::fs;
 
 mod interpreter;
 mod parser;
-mod program;
+mod source_watcher;
 mod util;
 mod video_loader;
 mod video_reader;
 mod video_runner;
 
 fn main() -> Result<(), ffmpeg::Error> {
-    let input = "
-        directory = '/Users/sebastianpfluegelmeier/test/';
-        extension = '.mp4';
-        clip a = 'a'[1.1:1.3] | 'b';
-        a[:4]
-    ";
-
-    let parsed = parse_main(input).unwrap().1;
-    println!("{:?}", parsed);
-    let path = parsed.directory_declaration.directory.clone();
-    let extension = parsed.extension_declaration.extension.clone();
-    let interpreted = interpret(parsed);
-    println!("interpreted {:?}", interpreted);
-    let mut runner = VideoRunner::new(60.0, 120.0, interpreted.commands,interpreted.length.into());
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Please provide a file path as a CLI argument");
+        return Ok(());
+    }
+    let mut source_watcher = SourceWatcher::new(&args[1]);
+    let interpreted = source_watcher.get_first_interpreted();
+    let filepath = source_watcher.get_file_path();
+    let extension = source_watcher.get_extension();
+    let fps = 60.0;
+    let mut runner = VideoRunner::new(fps, 120.0, interpreted.commands, interpreted.length.into());
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -46,26 +46,27 @@ fn main() -> Result<(), ffmpeg::Error> {
         .build()
         .unwrap();
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
 
     let texture_creator = canvas.texture_creator();
     let mut video_loader = VideoLoader::new(target_w, target_h);
     let mut previous_frame_time = Instant::now();
-    let frame_duration = Duration::from_secs_f64(1.0 / 60.0);
+    let frame_duration = Duration::from_secs_f64(1.0 / fps);
     'mainloop: loop {
-        let cmd = runner.advance_time(1.0 / 60.0);
-        let video = match cmd {
-            video_runner::FrameCommand::ShowSingleFrame { file, frame } => {
-                video_loader.load(&format!("{}{}{}", &path, &file, &extension), frame)
-            }
+        let cmd = runner.advance_time(1.0 / fps);
+        let video = match cmd.clone() {
+            video_runner::FrameCommand::ShowSingleFrame {
+                file: Some(file),
+                frame,
+            } => video_loader.load(&format!("{}{}{}", &filepath, &file, &extension), frame),
+            _ => None,
         };
 
         if let Some(video) = video {
             let texture = frame_to_texture(video, target_w, target_h, &texture_creator);
-
             let _ = canvas.copy(&texture, None, None);
+            canvas.present();
         }
-        canvas.present();
 
         for event in sdl_context.event_pump().unwrap().poll_iter() {
             match event {
@@ -82,7 +83,8 @@ fn main() -> Result<(), ffmpeg::Error> {
 
         let elapsed_frame_time = previous_frame_time.elapsed();
         if elapsed_frame_time < frame_duration {
-            std::thread::sleep(frame_duration - elapsed_frame_time);
+            let sleep_time = frame_duration - elapsed_frame_time;
+            std::thread::sleep(sleep_time);
         }
         previous_frame_time = Instant::now();
     }

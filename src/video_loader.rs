@@ -6,6 +6,7 @@ use crate::video_reader::VideoReader;
 
 pub struct VideoLoader {
     readers: HashMap<String, VideoReader>,
+    last_video: String,
     target_w: u32,
     target_h: u32,
 }
@@ -16,6 +17,7 @@ impl VideoLoader {
             readers: HashMap::new(),
             target_w,
             target_h,
+            last_video: "".to_string(),
         }
     }
 
@@ -27,6 +29,15 @@ impl VideoLoader {
     }
 
     pub fn load(&mut self, name: &str, frame: usize) -> Option<Video> {
+        if name != &self.last_video {
+            self.readers.get_mut(name).map(|r| {
+                // THIS IS THE UGLIEST HACK FIX IN EXISTENCE BUT SEEMS TO WORK
+                r.read_frame(frame);
+                while r.read_frame(frame).is_none() {};
+                r.read_frame(frame);
+            });
+            self.last_video = name.to_string();
+        }
         if let Some(reader) = self.readers.get_mut(name) {
             reader.read_frame(frame)
         } else {

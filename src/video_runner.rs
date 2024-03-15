@@ -9,7 +9,7 @@ pub struct VideoRunner {
     bpm: f64,
     beats: f64,
     current_frame: usize,
-    current_file: String,
+    current_file: Option<String>,
     commands: Vec<(Time, ClipCommand)>,
     commands_idx: usize,
     loop_length: f64,
@@ -24,7 +24,7 @@ impl VideoRunner {
             beats: 0.0,
             current_frame: 0,
             commands_idx: 0,
-            current_file: "".to_string(),
+            current_file: None,
             commands,
             loop_length
         }
@@ -43,11 +43,11 @@ impl VideoRunner {
             if let Some((_, command)) = &self.commands.get(self.commands_idx) {
                 match command {
                     ClipCommand::PlayClip(name) => {
-                        self.current_file = name.clone();
+                        self.current_file = Some(name.clone());
                         self.current_frame = 0;
                     }
                     ClipCommand::PlayClipFrom(name, time) => {
-                        self.current_file = name.clone();
+                        self.current_file = Some(name.clone());
                         self.current_frame =
                             ((time.num as f64 / time.denom as f64) * self.bpm) as usize
                     }
@@ -62,12 +62,13 @@ impl VideoRunner {
         };
 
         self.time += seconds;
-        self.beats += 60.0 * seconds / self.bpm;
+        self.beats += self.fps * seconds / self.bpm;
         self.current_frame += 1;
         if self.beats > self.loop_length {
             self.beats -= self.loop_length;
             self.time = 0.0;
             self.current_frame = 0;
+            self.current_file = None;
             self.commands_idx = 0;
         }
 
@@ -75,7 +76,7 @@ impl VideoRunner {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FrameCommand {
-    ShowSingleFrame { file: String, frame: usize },
+    ShowSingleFrame { file: Option<String>, frame: usize },
 }
