@@ -426,10 +426,17 @@ fn parse_time_sixteenth_expression(input: &str) -> IResult<&str, usize> {
 #[derive(Debug, Clone)]
 pub struct MultiVideoExpression {
     pub filename: String,
+    pub subclips: usize
 }
 pub fn parse_multi_video_expression(input: &str) -> IResult<&str, ClipExpression> {
     let (input, _) = multispace0(input)?;
     let (input, _) = tag("multi")(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, subclips) = digit1(input)?;
+
+    let subclips = subclips
+        .parse::<usize>()
+        .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char)))?;
     let (input, _) = multispace0(input)?;
     let (input, filename) = alt((
         delimited(char('\''), recognize(take_until("'")), char('\'')),
@@ -438,8 +445,9 @@ pub fn parse_multi_video_expression(input: &str) -> IResult<&str, ClipExpression
     let (input, _) = multispace0(input)?;
     Ok((
         input,
-        ClipExpression::RawVideo(RawVideoExpression {
+        ClipExpression::MultiVideo(MultiVideoExpression {
             filename: filename.into(),
+            subclips, 
         }),
     ))
 }

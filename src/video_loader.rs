@@ -41,6 +41,7 @@ impl VideoLoader {
         if let Some(reader) = self.readers.get_mut(name) {
             reader.read_frame(frame)
         } else {
+            println!("filename {}", name);
             self.readers.insert(
                 name.to_string(),
                 VideoReader::new(name.to_string(), self.target_w, self.target_h).unwrap(),

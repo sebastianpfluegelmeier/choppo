@@ -3,14 +3,12 @@ use std::{
     ops::{Add, Sub},
 };
 
-use ffmpeg::time;
-use fraction::Fraction;
-
 use crate::{
     parser::{
-        BeatChainExpression, BeatExpression, ClipChainExpression, ClipExpression,
-        DotBeatExpression, Main, NumberBeatExpression, RawVideoExpression, ReferenceBeatExpression,
-        ReferenceClipExpression, TimeExpression, TruncatedClipExpression,
+        ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression,
+        ClipExpression, DotBeatExpression, Main, MultiVideoExpression, NumberBeatExpression,
+        RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression, TimeExpression,
+        TruncatedClipExpression,
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -46,25 +44,44 @@ pub fn interpret(input: Main) -> InterpretedClip {
     let clips_interpreted = clips
         .iter()
         .fold(HashMap::new(), |interpreted_clips, (name, clip)| {
-            let (result, mut interpreted_clips) =
-                interpret_clip_expression(clip, clips.clone(), interpreted_clips);
+            let (result, mut interpreted_clips) = interpret_clip_expression(
+                clip,
+                clips.clone(),
+                interpreted_clips,
+                beats_interpreted.clone(),
+            );
             interpreted_clips.insert(name.clone(), result);
             return interpreted_clips;
         });
-    interpret_clip_expression(&input.main_expression, clips, clips_interpreted).0
+    interpret_clip_expression(
+        &input.main_expression,
+        clips,
+        clips_interpreted,
+        beats_interpreted,
+    )
+    .0
 }
 
 fn interpret_clip_expression(
     clip: &ClipExpression,
     all_clip_expressions: HashMap<String, ClipExpression>,
     interpreted_clips: HashMap<String, InterpretedClip>,
+    interpreted_beats: HashMap<String, InterpretedBeat>,
 ) -> (InterpretedClip, HashMap<String, InterpretedClip>) {
     match clip {
         ClipExpression::Chain(ClipChainExpression { clip_a, clip_b }) => {
-            let (clip_a, interpreted_clips) =
-                interpret_clip_expression(clip_a, all_clip_expressions.clone(), interpreted_clips);
-            let (mut clip_b, interpreted_clips) =
-                interpret_clip_expression(clip_b, all_clip_expressions, interpreted_clips);
+            let (clip_a, interpreted_clips) = interpret_clip_expression(
+                clip_a,
+                all_clip_expressions.clone(),
+                interpreted_clips,
+                interpreted_beats.clone(),
+            );
+            let (mut clip_b, interpreted_clips) = interpret_clip_expression(
+                clip_b,
+                all_clip_expressions,
+                interpreted_clips,
+                interpreted_beats,
+            );
             for command in &mut clip_b.commands {
                 command.0 = &command.0 + &clip_a.length;
             }
@@ -80,8 +97,12 @@ fn interpret_clip_expression(
             )
         }
         ClipExpression::Truncated(TruncatedClipExpression { clip, timerange }) => {
-            let (mut clip, interpreted_clips) =
-                interpret_clip_expression(clip, all_clip_expressions, interpreted_clips);
+            let (mut clip, interpreted_clips) = interpret_clip_expression(
+                clip,
+                all_clip_expressions,
+                interpreted_clips,
+                interpreted_beats,
+            );
             let from = time_expression_to_time(&timerange.from.clone().unwrap_or(TimeExpression {
                 beat: 0,
                 sixteenth: None,
@@ -102,6 +123,21 @@ fn interpret_clip_expression(
                         ClipCommand::PlayClipFrom(path, time) => {
                             command.1 = ClipCommand::PlayClipFrom(path.clone(), time + &from)
                         }
+                        ClipCommand::PlayMulti(path, subclips) => {
+                            command.1 = ClipCommand::PlayMultiFrom(
+                                path.clone(),
+                                Time {
+                                    num: command.0.num,
+                                    denom: command.0.denom,
+                                },
+                                *subclips,
+                            )
+                        }
+                        ClipCommand::PlayMultiFrom(path, time, subclips) => {
+                            command.1 =
+                                ClipCommand::PlayMultiFrom(path.clone(), time + &from, *subclips)
+                        }
+                        ClipCommand::MultiNext => (),
                     };
                     command.0 = Time { num: 0, denom: 1 };
                 }
@@ -127,7 +163,16 @@ fn interpret_clip_expression(
             },
             interpreted_clips,
         ),
-        ClipExpression::MultiVideo(_) => todo!(),
+        ClipExpression::MultiVideo(MultiVideoExpression { filename, subclips }) => (
+            InterpretedClip {
+                commands: vec![(
+                    Time { num: 0, denom: 1 },
+                    ClipCommand::PlayMulti(filename.clone(), *subclips),
+                )],
+                length: Time { num: 1, denom: 1 },
+            },
+            interpreted_clips,
+        ),
         ClipExpression::Reference(ReferenceClipExpression { name }) => {
             if let Some(clip) = interpreted_clips.get(name) {
                 (clip.clone(), interpreted_clips)
@@ -136,12 +181,33 @@ fn interpret_clip_expression(
                     &all_clip_expressions[name],
                     all_clip_expressions.clone(),
                     interpreted_clips,
+                    interpreted_beats,
                 );
                 interpreted_clips.insert(name.clone(), clip.clone());
                 (clip, interpreted_clips)
             }
         }
-        ClipExpression::ApplyBeat(_) => todo!(),
+        ClipExpression::ApplyBeat(ApplyBeatExpression {
+            beat_expression,
+            clip_expression,
+        }) => {
+            let (mut clip, interpreted_clips) = interpret_clip_expression(
+                clip_expression,
+                all_clip_expressions.clone(),
+                interpreted_clips,
+                interpreted_beats.clone(),
+            );
+            let (beat, _) =
+                interpret_beat_expression(beat_expression, HashMap::new(), interpreted_beats);
+            let mut beat_commands = beat
+                .beats
+                .into_iter()
+                .map(|b| (b, ClipCommand::MultiNext))
+                .collect();
+            clip.commands.append(&mut beat_commands);
+            clip.commands.sort_by_key(|b| time_to_frac(&b.0));
+            (clip, interpreted_clips)
+        }
     }
 }
 
@@ -277,12 +343,15 @@ pub struct InterpretedClip {
 pub enum ClipCommand {
     PlayClip(String),
     PlayClipFrom(String, Time),
+    PlayMulti(String, usize),
+    PlayMultiFrom(String, Time, usize),
+    MultiNext,
 }
 
 #[derive(Clone, Debug)]
 pub struct InterpretedBeat {
-    beats: Vec<Time>,
-    length: Time,
+    pub beats: Vec<Time>,
+    pub length: Time,
 }
 
 #[derive(Clone, Debug)]

@@ -27,10 +27,10 @@ fn main() -> Result<(), ffmpeg::Error> {
         eprintln!("Please provide a file path as a CLI argument");
         return Ok(());
     }
-    let mut source_watcher = SourceWatcher::new(&args[1]);
+    let mut source_watcher = SourceWatcher::new(args[1].to_string());
     let interpreted = source_watcher.get_first_interpreted();
-    let filepath = source_watcher.get_file_path();
-    let extension = source_watcher.get_extension();
+    let filepath = source_watcher.get_file_path().clone();
+    let extension = source_watcher.get_extension().clone();
     let fps = 60.0;
     let mut runner = VideoRunner::new(fps, 120.0, interpreted.commands, interpreted.length.into());
 
@@ -53,12 +53,18 @@ fn main() -> Result<(), ffmpeg::Error> {
     let mut previous_frame_time = Instant::now();
     let frame_duration = Duration::from_secs_f64(1.0 / fps);
     'mainloop: loop {
+        if let Some(clip) = source_watcher.get_new_interpreted() {
+            runner.set_commands(clip.commands, clip.length.into());
+        }
         let cmd = runner.advance_time(1.0 / fps);
         let video = match cmd.clone() {
             video_runner::FrameCommand::ShowSingleFrame {
-                file: Some(file),
+                file,
                 frame,
-            } => video_loader.load(&format!("{}{}{}", &filepath, &file, &extension), frame),
+            } => video_loader.load(
+                &format!("{}{}{}", &filepath.clone(), &file, &extension),
+                frame,
+            ),
             _ => None,
         };
 

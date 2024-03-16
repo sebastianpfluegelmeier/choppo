@@ -20,35 +20,28 @@ pub struct SourceWatcher {
 }
 
 impl SourceWatcher {
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: String) -> Self {
         let (sender, receiver) = channel();
 
-        let input = fs::read_to_string(path).expect("could not read input");
+        let input = fs::read_to_string(&path).expect("could not read input");
 
         let parsed = parse_main(&input).unwrap().1;
-        let metadata = fs::metadata(path).unwrap();
+        let metadata = fs::metadata(&path).unwrap();
+        println!("\n\n{:?}\n\n", parsed);
 
         let last_timestamp = FileTime::from_last_modification_time(&metadata);
-        // thread::spawn(move || {
-        //     let mut last_timestamp = last_timestamp.clone();
+        let path = path.clone();
+        let path_ = path.clone();
+        thread::spawn(move || {
+            let mut last_timestamp = last_timestamp.clone();
 
-        //     loop {
-        //         let metadata = fs::metadata(path).unwrap();
-        //         let timestamp = FileTime::from_last_modification_time(&metadata);
-        //         if last_timestamp != timestamp {
-        //             let input = fs::read_to_string(path).expect("could not read input");
-
-        //             let parsed = parse_main(&input).unwrap().1;
-        //             let path = parsed.directory_declaration.directory.clone();
-        //             let extension = parsed.extension_declaration.extension.clone();
-        //             let interpreted = interpret(parsed);
-        //             sender.send(interpreted);
-        //         }
-        //     }
-        // });
+            loop {
+                read_input(&path, last_timestamp, &sender);
+            }
+        });
 
         Self {
-            file_path: path.to_string(),
+            file_path: path_.to_string(),
             video_path: parsed.directory_declaration.directory,
             extension: parsed.extension_declaration.extension,
             last_timestamp,
@@ -64,7 +57,7 @@ impl SourceWatcher {
         return interpreted;
     }
 
-    pub fn get_first_interpreted(&mut self) -> InterpretedClip {
+    pub fn get_first_interpreted(&self) -> InterpretedClip {
         let input = fs::read_to_string(&self.file_path).expect("could not read input");
 
         let parsed = parse_main(&input).unwrap().1;
@@ -77,4 +70,21 @@ impl SourceWatcher {
     pub fn get_extension(&self) -> &String {
         &self.extension
     }
+}
+
+fn read_input(
+    path: &String,
+    last_timestamp: FileTime,
+    sender: &std::sync::mpsc::Sender<InterpretedClip>,
+) -> Result<(), ()> {
+    let metadata = fs::metadata(path).unwrap();
+    let timestamp = FileTime::from_last_modification_time(&metadata);
+    if last_timestamp != timestamp {
+        let input = fs::read_to_string(path).map_err(|e| ())?;
+
+        let parsed = parse_main(&input).map_err(|e| ())?.1;
+        let interpreted = interpret(parsed);
+        let _ = sender.send(interpreted);
+    }
+    Result::Ok(())
 }
