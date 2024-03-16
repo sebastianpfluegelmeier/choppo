@@ -33,7 +33,7 @@ impl VideoLoader {
             self.readers.get_mut(name).map(|r| {
                 // THIS IS THE UGLIEST HACK FIX IN EXISTENCE BUT SEEMS TO WORK
                 r.read_frame(frame);
-                while r.read_frame(frame).is_none() {};
+                while r.read_frame(frame).is_none() {}
                 r.read_frame(frame);
             });
             self.last_video = name.to_string();

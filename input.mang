@@ -1,6 +1,6 @@
 directory = '/Users/sebastianpfluegelmeier/test/';
-extension = '.mp4';
+extension = '.avi';
 
-clip mul = multi 3 'm';
-beat b = ....;
-....@mul[:2]
+beat b = .--.--.--.--.--.;
+clip m = multi 2 'm';
+b@m

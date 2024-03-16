@@ -272,12 +272,12 @@ pub enum ClipExpression {
 
 pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
     alt((
+        parse_apply_beat_expression,
         parse_clip_chain_expression,
         parse_truncated_clip_expression,
         parse_raw_video_expression,
         parse_multi_video_expression,
         parse_reference_clip_expression,
-        parse_apply_beat_expression,
     ))(input)
 }
 
@@ -426,7 +426,7 @@ fn parse_time_sixteenth_expression(input: &str) -> IResult<&str, usize> {
 #[derive(Debug, Clone)]
 pub struct MultiVideoExpression {
     pub filename: String,
-    pub subclips: usize
+    pub subclips: usize,
 }
 pub fn parse_multi_video_expression(input: &str) -> IResult<&str, ClipExpression> {
     let (input, _) = multispace0(input)?;
@@ -447,7 +447,7 @@ pub fn parse_multi_video_expression(input: &str) -> IResult<&str, ClipExpression
         input,
         ClipExpression::MultiVideo(MultiVideoExpression {
             filename: filename.into(),
-            subclips, 
+            subclips,
         }),
     ))
 }

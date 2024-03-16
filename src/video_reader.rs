@@ -126,5 +126,4 @@ impl VideoReader {
             None
         }
     }
-
 }

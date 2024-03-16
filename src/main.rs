@@ -58,10 +58,7 @@ fn main() -> Result<(), ffmpeg::Error> {
         }
         let cmd = runner.advance_time(1.0 / fps);
         let video = match cmd.clone() {
-            video_runner::FrameCommand::ShowSingleFrame {
-                file,
-                frame,
-            } => video_loader.load(
+            video_runner::FrameCommand::ShowSingleFrame { file, frame } => video_loader.load(
                 &format!("{}{}{}", &filepath.clone(), &file, &extension),
                 frame,
             ),
