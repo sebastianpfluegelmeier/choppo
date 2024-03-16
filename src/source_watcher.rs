@@ -1,5 +1,5 @@
 use filetime::FileTime;
-use sdl2::libc::times;
+
 
 use crate::{
     interpreter::{interpret, InterpretedClip},
@@ -33,7 +33,7 @@ impl SourceWatcher {
         let path = path.clone();
         let path_ = path.clone();
         thread::spawn(move || {
-            let mut last_timestamp = last_timestamp.clone();
+            let last_timestamp = last_timestamp;
 
             loop {
                 read_input(&path, last_timestamp, &sender);
@@ -54,7 +54,7 @@ impl SourceWatcher {
         for i in self.receiver.try_iter() {
             interpreted = Some(i);
         }
-        return interpreted;
+        interpreted
     }
 
     pub fn get_first_interpreted(&self) -> InterpretedClip {
@@ -80,9 +80,9 @@ fn read_input(
     let metadata = fs::metadata(path).unwrap();
     let timestamp = FileTime::from_last_modification_time(&metadata);
     if last_timestamp != timestamp {
-        let input = fs::read_to_string(path).map_err(|e| ())?;
+        let input = fs::read_to_string(path).map_err(|_e| ())?;
 
-        let parsed = parse_main(&input).map_err(|e| ())?.1;
+        let parsed = parse_main(&input).map_err(|_e| ())?.1;
         let interpreted = interpret(parsed);
         let _ = sender.send(interpreted);
     }

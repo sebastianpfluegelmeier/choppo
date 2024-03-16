@@ -1,17 +1,17 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use std::time::Duration;
+
 
 use ffmpeg::ffi::{avformat_seek_file, AVSEEK_FLAG_FRAME};
 use ffmpeg::format::{input, Pixel};
 use ffmpeg::frame::Video;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling::{context::Context, flag::Flags};
-use ffmpeg::Error;
-use ffmpeg_sys_next::{av_index_search_timestamp, AVStream};
+
+
 
 pub struct VideoReader {
     scaler: Context,
@@ -73,9 +73,9 @@ impl VideoReader {
                                     avformat_seek_file(
                                         ictx.as_mut_ptr(),
                                         -1,
-                                        timestamp as i64,
-                                        timestamp as i64,
-                                        timestamp as i64,
+                                        timestamp,
+                                        timestamp,
+                                        timestamp,
                                         AVSEEK_FLAG_FRAME,
                                     );
                                 }

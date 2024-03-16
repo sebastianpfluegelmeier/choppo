@@ -172,7 +172,7 @@ pub fn parse_number_beats(input: &str) -> IResult<&str, Vec<usize>> {
 
 pub fn parse_number_beat(input: &str) -> IResult<&str, usize> {
     let (input, _) = multispace0(input)?;
-    let (input, beat) = take_while_m_n(1, 1, |c: char| c.is_digit(10))(input)?;
+    let (input, beat) = take_while_m_n(1, 1, |c: char| c.is_ascii_digit())(input)?;
     let beat = beat
         .parse::<usize>()
         .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char)))?;
@@ -353,7 +353,7 @@ pub struct TruncatedClipExpression {
     pub timerange: TimeRangeExpression,
 }
 pub fn parse_truncated_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
-    if !input.contains("[") && !input.contains("]") {
+    if !input.contains('[') && !input.contains(']') {
         return fail(input);
     }
     let (input, _) = multispace0(input)?;

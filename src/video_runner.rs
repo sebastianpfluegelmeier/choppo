@@ -1,6 +1,5 @@
 use crate::{
     interpreter::{ClipCommand, Time},
-    util::time_to_frac,
 };
 
 pub struct VideoRunner {
@@ -89,10 +88,10 @@ impl VideoRunner {
                     }
                     ClipCommand::MultiNext => {
                         if let DisplayState::Multi {
-                            file,
+                            file: _,
                             sub,
                             subs_amt,
-                            frame,
+                            frame: _,
                         } = &mut self.display_state
                         {
                             *sub += 1;
@@ -114,12 +113,12 @@ impl VideoRunner {
             },
             DisplayState::Multi {
                 file,
-                subs_amt,
+                subs_amt: _,
                 sub,
                 frame,
             } => FrameCommand::ShowSingleFrame {
                 file: format!("{}_{}", file.clone(), sub),
-                frame: frame.clone(),
+                frame: *frame,
             },
         };
 
@@ -127,11 +126,11 @@ impl VideoRunner {
         self.beats += self.fps * seconds / self.bpm;
         match &mut self.display_state {
             DisplayState::None => (),
-            DisplayState::Single { file, frame } => *frame += 1,
+            DisplayState::Single { file: _, frame } => *frame += 1,
             DisplayState::Multi {
-                file,
-                sub,
-                subs_amt,
+                file: _,
+                sub: _,
+                subs_amt: _,
                 frame,
             } => *frame += 1,
         }

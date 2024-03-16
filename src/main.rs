@@ -5,13 +5,13 @@ use std::time::{Duration, Instant};
 use crate::source_watcher::SourceWatcher;
 use crate::video_loader::VideoLoader;
 use crate::video_runner::VideoRunner;
-use crate::{interpreter::interpret, parser::parse_main, video_reader::VideoReader};
+
 use sdl2::keyboard::Keycode;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
 use std::env;
-use std::fs;
+
 
 mod interpreter;
 mod parser;

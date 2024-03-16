@@ -39,7 +39,7 @@ pub fn interpret(input: Main) -> InterpretedClip {
             let (result, mut interpreted_beats) =
                 interpret_beat_expression(beat, beats.clone(), interpreted_beats);
             interpreted_beats.insert(name.clone(), result);
-            return interpreted_beats;
+            interpreted_beats
         });
     let clips_interpreted = clips
         .iter()
@@ -51,7 +51,7 @@ pub fn interpret(input: Main) -> InterpretedClip {
                 beats_interpreted.clone(),
             );
             interpreted_clips.insert(name.clone(), result);
-            return interpreted_clips;
+            interpreted_clips
         });
     interpret_clip_expression(
         &input.main_expression,
@@ -144,11 +144,7 @@ fn interpret_clip_expression(
             }
             if let Some(to) = &timerange.to {
                 let to = time_expression_to_time(to) - from;
-                clip.commands = clip
-                    .commands
-                    .into_iter()
-                    .filter(|c| time_to_frac(&c.0) < time_to_frac(&to))
-                    .collect();
+                clip.commands.retain(|c| time_to_frac(&c.0) < time_to_frac(&to));
                 clip.length = to;
             }
             (clip, interpreted_clips)
@@ -245,12 +241,12 @@ fn interpret_beat_chain_expression(
     interpreted_beats: HashMap<String, InterpretedBeat>,
 ) -> (InterpretedBeat, HashMap<String, InterpretedBeat>) {
     let (beat_a, interpreted_beats) = interpret_beat_expression(
-        &*expression.beat_a,
+        &expression.beat_a,
         all_beat_expressions.clone(),
         interpreted_beats,
     );
     let (beat_b, interpreted_beats) =
-        interpret_beat_expression(&*expression.beat_b, all_beat_expressions, interpreted_beats);
+        interpret_beat_expression(&expression.beat_b, all_beat_expressions, interpreted_beats);
     let a_length = time_to_frac(&beat_a.length);
     let sum_length = frac_to_time(&(a_length + time_to_frac(&beat_b.length)));
     let beats_b_updated: Vec<Time> = beat_b
@@ -360,9 +356,9 @@ pub struct Time {
     pub denom: usize,
 }
 
-impl Into<f64> for Time {
-    fn into(self) -> f64 {
-        self.num as f64 / self.denom as f64
+impl From<Time> for f64 {
+    fn from(val: Time) -> Self {
+        val.num as f64 / val.denom as f64
     }
 }
 
@@ -370,7 +366,7 @@ impl Sub for &Time {
     type Output = Time;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        return frac_to_time(&(time_to_frac(&self) - time_to_frac(&rhs)));
+        frac_to_time(&(time_to_frac(self) - time_to_frac(rhs)))
     }
 }
 
@@ -378,7 +374,7 @@ impl Sub for Time {
     type Output = Time;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        return frac_to_time(&(time_to_frac(&self) - time_to_frac(&rhs)));
+        frac_to_time(&(time_to_frac(&self) - time_to_frac(&rhs)))
     }
 }
 
@@ -386,6 +382,6 @@ impl Add for &Time {
     type Output = Time;
 
     fn add(self, rhs: Self) -> Self::Output {
-        return frac_to_time(&(time_to_frac(&self) + time_to_frac(&rhs)));
+        frac_to_time(&(time_to_frac(self) + time_to_frac(rhs)))
     }
 }
