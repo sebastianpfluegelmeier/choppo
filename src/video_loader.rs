@@ -23,7 +23,6 @@ impl VideoLoader {
         if let Some((reader, last_frame)) = self.readers.get_mut(name) {
             if *last_frame + 1 != frame {
                 *last_frame = frame;
-                reader.stop_reader();
                 let mut reader =
                     VideoReader::new(name.to_string(), frame, self.target_w, self.target_h);
                 if reader.is_none() {
