@@ -212,7 +212,7 @@ fn reduce_truncate_expression(
                     command.1 = ClipCommand::PlayMultiFrom(
                         path.clone(),
                         Time {
-                            num: command.0.num,
+                            num: -command.0.num,
                             denom: command.0.denom,
                         },
                         *subclips,
@@ -339,7 +339,7 @@ fn reduce_dot_beat_expression(expression: &DotBeatExpression) -> ReducedBeat {
         .enumerate()
         .filter_map(|(index, beat_on)| {
             let time = Time {
-                num: (index + 1) as isize,
+                num: index as isize,
                 denom: 16,
             };
             if *beat_on {

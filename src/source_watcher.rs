@@ -1,9 +1,8 @@
 use filetime::FileTime;
 
-
 use crate::{
-    reducer::{reduce, ReducedClip},
     parser::parse_main,
+    reducer::{reduce, ReducedClip},
 };
 use std::{
     fs,
@@ -15,7 +14,6 @@ pub struct SourceWatcher {
     file_path: String,
     video_path: String,
     extension: String,
-    last_timestamp: FileTime,
     receiver: Receiver<ReducedClip>,
 }
 
@@ -26,17 +24,21 @@ impl SourceWatcher {
         let input = fs::read_to_string(&path).expect("could not read input");
 
         let parsed = parse_main(&input).unwrap().1;
-        let metadata = fs::metadata(&path).unwrap();
-        println!("\n\n{:?}\n\n", parsed);
-
-        let last_timestamp = FileTime::from_last_modification_time(&metadata);
         let path = path.clone();
         let path_ = path.clone();
         thread::spawn(move || {
-            let last_timestamp = last_timestamp;
+            let mut last_timestamp = FileTime::now();
 
             loop {
-                read_input(&path, last_timestamp, &sender);
+                let metadata = fs::metadata(path.clone()).unwrap();
+                let timestamp = FileTime::from_last_modification_time(&metadata);
+                if last_timestamp != timestamp {
+                    let input = fs::read_to_string(path.clone())
+                        .map_err(|_e| ())
+                        .expect("could not find file");
+                    let _ = read_input(input, &sender);
+                    last_timestamp = timestamp;
+                }
             }
         });
 
@@ -44,7 +46,6 @@ impl SourceWatcher {
             file_path: path_.to_string(),
             video_path: parsed.directory_declaration.directory,
             extension: parsed.extension_declaration.extension,
-            last_timestamp,
             receiver,
         }
     }
@@ -72,19 +73,9 @@ impl SourceWatcher {
     }
 }
 
-fn read_input(
-    path: &String,
-    last_timestamp: FileTime,
-    sender: &std::sync::mpsc::Sender<ReducedClip>,
-) -> Result<(), ()> {
-    let metadata = fs::metadata(path).unwrap();
-    let timestamp = FileTime::from_last_modification_time(&metadata);
-    if last_timestamp != timestamp {
-        let input = fs::read_to_string(path).map_err(|_e| ())?;
-
-        let parsed = parse_main(&input).map_err(|_e| ())?.1;
-        let interpreted = reduce(parsed);
-        let _ = sender.send(interpreted);
-    }
+fn read_input(input: String, sender: &std::sync::mpsc::Sender<ReducedClip>) -> Result<(), ()> {
+    let parsed = parse_main(&input).map_err(|_e| ())?.1;
+    let interpreted = reduce(parsed);
+    let _ = sender.send(interpreted);
     Result::Ok(())
 }

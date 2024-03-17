@@ -5,8 +5,7 @@ use ffmpeg::frame::Video;
 use crate::video_reader::VideoReader;
 
 pub struct VideoLoader {
-    readers: HashMap<String, VideoReader>,
-    last_video: String,
+    readers: HashMap<String, (VideoReader, usize)>,
     target_w: u32,
     target_h: u32,
 }
@@ -17,33 +16,35 @@ impl VideoLoader {
             readers: HashMap::new(),
             target_w,
             target_h,
-            last_video: "".to_string(),
         }
-    }
-
-    pub fn preload(&mut self, name: &str) {
-        self.readers.insert(
-            name.to_string(),
-            VideoReader::new(name.to_string(), self.target_w, self.target_h).unwrap(),
-        );
     }
 
     pub fn load(&mut self, name: &str, frame: usize) -> Option<Video> {
-        if name != &self.last_video {
-            self.readers.get_mut(name).map(|r| {
-                // THIS IS THE UGLIEST HACK FIX IN EXISTENCE BUT SEEMS TO WORK
-                r.read_frame(frame);
-                while r.read_frame(frame).is_none() {}
-                r.read_frame(frame);
-            });
-            self.last_video = name.to_string();
-        }
-        if let Some(reader) = self.readers.get_mut(name) {
-            reader.read_frame(frame)
+        if let Some((reader, last_frame)) = self.readers.get_mut(name) {
+            if *last_frame + 1 != frame {
+                *last_frame = frame;
+                reader.stop_reader();
+                let mut reader =
+                    VideoReader::new(name.to_string(), frame, self.target_w, self.target_h);
+                if reader.is_none() {
+                    return None;
+                }
+                let frame_ = reader.as_mut().unwrap().read_next_frame();
+                self.readers
+                    .insert(name.to_string(), (reader.unwrap(), frame));
+                frame_
+            } else {
+                *last_frame = frame;
+                reader.read_next_frame()
+            }
         } else {
             self.readers.insert(
                 name.to_string(),
-                VideoReader::new(name.to_string(), self.target_w, self.target_h).unwrap(),
+                (
+                    VideoReader::new(name.to_string(), frame, self.target_w, self.target_h)
+                        .unwrap(),
+                    frame,
+                ),
             );
             self.load(name, frame)
         }
