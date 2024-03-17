@@ -69,6 +69,7 @@ impl VideoReader {
                             if current_frame != last_frame + 1 {
                                 let timestamp = current_frame as i64 * timebase_denominator
                                     / timebase_numerator;
+                                    println!("seek {}", frame);
                                 unsafe {
                                     avformat_seek_file(
                                         ictx.as_mut_ptr(),

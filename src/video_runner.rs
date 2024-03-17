@@ -13,6 +13,7 @@ pub struct VideoRunner {
     loop_length: f64,
 }
 
+#[derive(Debug)]
 enum DisplayState {
     None,
     Single {
