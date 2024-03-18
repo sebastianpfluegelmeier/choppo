@@ -2,7 +2,7 @@ directory = '/Users/sebastianpfluegelmeier/test/';
 extension = '.mp4';
 
 beat b = .......;
-clip m = multi 3 'p';
-clip multi = b@m[:2];
-clip single = 'p_0'[1.1:1.2] | 'p_1'[1.2:1.3] | 'p_2'[1.3:1.4] | 'p_0'[1.4:2.0];
-single
+clip m = multi 3 'pk';
+clip multi = b|b|b|b@m[:8];
+clip single = 'pk_0'[1.1:1.2] | 'pk_1'[1.2:1.3] | 'pk_2'[1.3:1.4] | 'pk_0'[1.4:2.0];
+multi

@@ -1,89 +1,129 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use ffmpeg::format::context::Input;
-use ffmpeg::format::input;
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
+
+use ffmpeg::ffi::{avformat_seek_file, AVSEEK_FLAG_FRAME};
+use ffmpeg::format::{input, Pixel};
 use ffmpeg::frame::Video;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling::{context::Context, flag::Flags};
-use ffmpeg::util::format::pixel::Pixel;
-use ffmpeg::util::format::sample::Type as SampleType;
-use ffmpeg::util::frame::video::Video as FfmpegVideo;
-use ffmpeg::util::rational::Rational;
-use ffmpeg_sys_next::SwsContext;
-use std::path::Path;
+use ffmpeg_sys_next::{AVSEEK_FLAG_ANY, AVSEEK_FORCE};
 
 pub struct VideoReader {
-    input: Input,
-    video_stream_index: usize,
-    video_info: VideoInfo, // Fixed the type of video_info
-    sws_context: SwsContext,
-    current_frame: usize,
-    target_w: u32,
-    target_h: u32,
+    scaler: Context,
+    buffer: Vec<Video>,
+    receiver: Receiver<(usize, Video)>,
+    sender: Sender<ToVideoThread>,
+}
+
+enum ToVideoThread {
+    LoadFrame,
+    Stop,
 }
 
 impl VideoReader {
-    pub fn new(
-        file_name: String,
-        start_frame: usize,
-        target_w: u32,
-        target_h: u32,
-    ) -> Option<Self> {
-        let path = Path::new(&file_name);
-        let input = input(&path).ok()?;
-        let input_ = input
-            .streams()
-            .best(Type::Video)
-            .ok_or(ffmpeg::Error::StreamNotFound)
+    pub fn new(file_name: String, frame: usize, target_w: u32, target_h: u32) -> Option<Self> {
+        ffmpeg::init().unwrap();
+        if let Ok(mut ictx) = input(&file_name) {
+            let input = ictx
+                .streams()
+                .best(Type::Video)
+                .ok_or(ffmpeg::Error::StreamNotFound)
+                .unwrap();
+            let video_stream_index = input.index();
+
+            let context_decoder =
+                ffmpeg::codec::context::Context::from_parameters(input.parameters()).unwrap();
+            let mut decoder = context_decoder.decoder().video().unwrap();
+
+            let scaler = Context::get(
+                decoder.format(),
+                decoder.width(),
+                decoder.height(),
+                Pixel::RGBA,
+                target_w,
+                target_h,
+                Flags::BILINEAR,
+            )
             .unwrap();
-        let video_stream_index = input
-            .streams()
-            .best(Type::Video)
-            .map(|stream| stream.index())
-            .unwrap_or(0);
-        let video_info = input.streams().best(Type::Video)?;
-        let context_decoder =
-            ffmpeg::codec::context::Context::from_parameters(input_.parameters()).unwrap();
-        let mut decoder = context_decoder.decoder().video().unwrap();
-        let sws_context = Context::get(
-            decoder.format(),
-            decoder.width(),
-            decoder.height(),
-            Pixel::RGB24,
-            target_w as u32,
-            target_h as u32,
-            Flags::BILINEAR,
-        )
-        .unwrap();
-        let current_frame = start_frame;
-        Some(Self {
-            input,
-            video_stream_index,
-            video_info,
-            sws_context,
-            current_frame,
-            target_w,
-            target_h,
-        })
+            let (video_sender, video_receiver): (Sender<(usize, Video)>, Receiver<(usize, Video)>) =
+                channel();
+            let (frame_sender, frame_receiver): (Sender<ToVideoThread>, Receiver<ToVideoThread>) =
+                channel();
+            let timebase_numerator = input.time_base().numerator() as i64;
+            let timebase_denominator = input.time_base().denominator() as i64;
+            thread::spawn(move || {
+                let mut current_frame = frame;
+                let mut frames_to_read = 3;
+                let timestamp = current_frame as i64 * timebase_denominator / timebase_numerator;
+                unsafe {
+                    avformat_seek_file(
+                        ictx.as_mut_ptr(),
+                        -1,
+                        timestamp,
+                        timestamp,
+                        timestamp,
+                        AVSEEK_FLAG_FRAME,
+                    );
+                }
+                loop {
+                    match frame_receiver.try_recv() {
+                        Ok(ToVideoThread::Stop) => {
+                            return;
+                        }
+                        Ok(ToVideoThread::LoadFrame) => {
+                            current_frame += 1;
+
+                            frames_to_read += 1;
+                        }
+                        Err(_) => (),
+                    }
+                    if frames_to_read > 0 {
+                        for (stream, packet) in ictx.packets() {
+                            if stream.index() == video_stream_index {
+                                decoder.send_packet(&packet).unwrap();
+                                frames_to_read -= 1;
+                                break;
+                            }
+                        }
+                    }
+                    let mut decoded = Video::empty();
+                    if decoder.receive_frame(&mut decoded).is_ok() {
+                        let _ = video_sender.send((current_frame, decoded));
+                    }
+                }
+            });
+            return Some(Self {
+                scaler,
+                sender: frame_sender,
+                receiver: video_receiver,
+                buffer: Vec::new(),
+            });
+        }
+        None
     }
 
     pub fn read_next_frame(&mut self) -> Option<Video> {
-        let mut packet = ffmpeg::packet::Packet::empty();
-        for (stream, packet) in self.input.packets() {
-            if packet.stream() == self.video_stream_index {
-                let mut frame = FfmpegVideo::empty();
-                match self.input.decode(&packet, &mut frame) {
-                    Ok(true) => {
-                        let mut rgb_frame = FfmpegVideo::empty();
-                        self.sws_context.scale(&frame, &mut rgb_frame).ok()?;
-                        self.current_frame += 1;
-                        return Some(rgb_frame.into());
-                    }
-                    Ok(false) => return None,
-                    Err(_) => return None,
-                }
+        let _ = self.sender.send(ToVideoThread::LoadFrame);
+        loop {
+            for (frame, video) in self.receiver.try_iter() {
+                self.buffer.push(video);
+            }
+            if !self.buffer.is_empty() {
+                break;
             }
         }
-        return None;
+        if let Some(frame) = self.buffer.pop() {
+            let mut rgb_frame = Video::empty();
+            self.scaler.run(&frame, &mut rgb_frame).unwrap();
+            Some(rgb_frame)
+        } else {
+            None
+        }
+    }
+    pub fn stop(&mut self) {
+        let _ = self.sender.send(ToVideoThread::Stop);
     }
 }
