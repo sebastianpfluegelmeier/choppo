@@ -43,12 +43,20 @@ pub fn reduce(input: Main) -> ReducedClip {
     let reduced_clips = clips
         .iter()
         .fold(HashMap::new(), |reduced_clips, (name, clip)| {
-            let (result, mut reduced_clips) =
-                reduce_clip_expression(clip, &clips, &reduced_clips, &reduced_beats);
+            let (result, mut reduced_clips) = reduce_clip_expression(
+                &input.directory_declaration.directory,
+                &input.extension_declaration.extension,
+                clip,
+                &clips,
+                &reduced_clips,
+                &reduced_beats,
+            );
             reduced_clips.insert(name.clone(), result);
             reduced_clips
         });
     reduce_clip_expression(
+        &input.directory_declaration.directory,
+        &input.extension_declaration.extension,
         &input.main_expression,
         &clips,
         &reduced_clips,
@@ -58,6 +66,8 @@ pub fn reduce(input: Main) -> ReducedClip {
 }
 
 fn reduce_clip_expression(
+    path: &str,
+    extension: &str,
     clip: &ClipExpression,
     all_clip_expressions: &HashMap<String, ClipExpression>,
     reduced_clips: &HashMap<String, ReducedClip>,
@@ -65,6 +75,8 @@ fn reduce_clip_expression(
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     match clip {
         ClipExpression::Chain(ClipChainExpression { clip_a, clip_b }) => reduce_chain_expression(
+            path,
+            extension,
             clip_a,
             &all_clip_expressions,
             &reduced_clips,
@@ -73,6 +85,8 @@ fn reduce_clip_expression(
         ),
         ClipExpression::Truncated(TruncatedClipExpression { clip, timerange }) => {
             reduce_truncate_expression(
+                path,
+                extension,
                 clip,
                 &all_clip_expressions,
                 &reduced_clips,
@@ -81,18 +95,25 @@ fn reduce_clip_expression(
             )
         }
         ClipExpression::RawVideo(RawVideoExpression { filename }) => {
-            reduce_raw_video_expression(filename, &reduced_clips)
+            reduce_raw_video_expression(path, extension, filename, &reduced_clips)
         }
         ClipExpression::MultiVideo(MultiVideoExpression { filename, subclips }) => {
-            reduce_multi_video_expression(filename, subclips, &reduced_clips)
+            reduce_multi_video_expression(path, extension, filename, subclips, &reduced_clips)
         }
-        ClipExpression::Reference(ReferenceClipExpression { name }) => {
-            reduce_reference_expression(&reduced_clips, name, &all_clip_expressions, &reduced_beats)
-        }
+        ClipExpression::Reference(ReferenceClipExpression { name }) => reduce_reference_expression(
+            path,
+            extension,
+            &reduced_clips,
+            name,
+            &all_clip_expressions,
+            &reduced_beats,
+        ),
         ClipExpression::ApplyBeat(ApplyBeatExpression {
             beat_expression,
             clip_expression,
         }) => reduce_apply_beat_expression(
+            path,
+            extension,
             &(*clip_expression),
             all_clip_expressions,
             reduced_clips,
@@ -103,14 +124,16 @@ fn reduce_clip_expression(
 }
 
 fn reduce_raw_video_expression(
-    filename: &String,
+    path: &str,
+    extension: &str,
+    filename: &str,
     reduced_clips: &HashMap<String, ReducedClip>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     (
         ReducedClip {
             commands: vec![(
                 Time { num: 0, denom: 1 },
-                ClipCommand::PlayClip(filename.clone()),
+                ClipCommand::PlayClip(format!("{}{}{}", path, filename, extension)),
             )],
             length: Time { num: 1, denom: 1 },
         },
@@ -119,7 +142,9 @@ fn reduce_raw_video_expression(
 }
 
 fn reduce_multi_video_expression(
-    filename: &String,
+    path: &str,
+    extension: &str,
+    filename: &str,
     subclips: &usize,
     reduced_clips: &HashMap<String, ReducedClip>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
@@ -127,7 +152,11 @@ fn reduce_multi_video_expression(
         ReducedClip {
             commands: vec![(
                 Time { num: 0, denom: 1 },
-                ClipCommand::PlayMulti(filename.clone(), *subclips),
+                ClipCommand::PlayMulti(
+                    format!("{}{}", path, filename),
+                    *subclips,
+                    extension.to_string(),
+                ),
             )],
             length: Time { num: 1, denom: 1 },
         },
@@ -136,6 +165,8 @@ fn reduce_multi_video_expression(
 }
 
 fn reduce_reference_expression(
+    path: &str,
+    extension: &str,
     reduced_clips: &HashMap<String, ReducedClip>,
     name: &String,
     all_clip_expressions: &HashMap<String, ClipExpression>,
@@ -145,6 +176,8 @@ fn reduce_reference_expression(
         (clip.clone(), reduced_clips.clone())
     } else {
         let (clip, mut reduced_clips) = reduce_clip_expression(
+            path,
+            extension,
             &all_clip_expressions[name],
             all_clip_expressions,
             reduced_clips,
@@ -156,6 +189,8 @@ fn reduce_reference_expression(
 }
 
 fn reduce_apply_beat_expression(
+    path: &str,
+    extension: &str,
     clip_expression: &Box<ClipExpression>,
     all_clip_expressions: &HashMap<String, ClipExpression>,
     reduced_clips: &HashMap<String, ReducedClip>,
@@ -163,6 +198,8 @@ fn reduce_apply_beat_expression(
     beat_expression: &BeatExpression,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     let (mut clip, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
         clip_expression,
         all_clip_expressions,
         reduced_clips,
@@ -180,14 +217,22 @@ fn reduce_apply_beat_expression(
 }
 
 fn reduce_truncate_expression(
+    path: &str,
+    extension: &str,
     clip: &Box<ClipExpression>,
     all_clip_expressions: &HashMap<String, ClipExpression>,
     reduced_clips: &HashMap<String, ReducedClip>,
     reduced_beats: &HashMap<String, ReducedBeat>,
     timerange: &crate::parser::TimeRangeExpression,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
-    let (mut clip, reduced_clips) =
-        reduce_clip_expression(clip, all_clip_expressions, reduced_clips, reduced_beats);
+    let (mut clip, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip,
+        all_clip_expressions,
+        reduced_clips,
+        reduced_beats,
+    );
     let from = time_expression_to_time(&timerange.from.clone().unwrap_or(TimeExpression {
         beat: 0,
         sixteenth: None,
@@ -208,7 +253,7 @@ fn reduce_truncate_expression(
                 ClipCommand::PlayClipFrom(path, time) => {
                     command.1 = ClipCommand::PlayClipFrom(path.clone(), time + &from)
                 }
-                ClipCommand::PlayMulti(path, subclips) => {
+                ClipCommand::PlayMulti(path, subclips, extension) => {
                     command.1 = ClipCommand::PlayMultiFrom(
                         path.clone(),
                         Time {
@@ -216,10 +261,12 @@ fn reduce_truncate_expression(
                             denom: command.0.denom,
                         },
                         *subclips,
+                        extension.clone(),
                     )
                 }
-                ClipCommand::PlayMultiFrom(path, time, subclips) => {
-                    command.1 = ClipCommand::PlayMultiFrom(path.clone(), time + &from, *subclips)
+                ClipCommand::PlayMultiFrom(path, time, subclips, extension) => {
+                    command.1 =
+                        ClipCommand::PlayMultiFrom(path.clone(), time + &from, *subclips, extension.clone())
                 }
                 ClipCommand::MultiNext => (),
             };
@@ -236,16 +283,30 @@ fn reduce_truncate_expression(
 }
 
 fn reduce_chain_expression(
+    path: &str,
+    extension: &str,
     clip_a: &Box<ClipExpression>,
     all_clip_expressions: &HashMap<String, ClipExpression>,
     reduced_clips: &HashMap<String, ReducedClip>,
     reduced_beats: &HashMap<String, ReducedBeat>,
     clip_b: &Box<ClipExpression>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
-    let (clip_a, reduced_clips) =
-        reduce_clip_expression(clip_a, all_clip_expressions, reduced_clips, reduced_beats);
-    let (mut clip_b, reduced_clips) =
-        reduce_clip_expression(clip_b, all_clip_expressions, &reduced_clips, reduced_beats);
+    let (clip_a, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip_a,
+        all_clip_expressions,
+        reduced_clips,
+        reduced_beats,
+    );
+    let (mut clip_b, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip_b,
+        all_clip_expressions,
+        &reduced_clips,
+        reduced_beats,
+    );
     for command in &mut clip_b.commands {
         command.0 = &command.0 + &clip_a.length;
     }
@@ -390,8 +451,8 @@ pub struct ReducedClip {
 pub enum ClipCommand {
     PlayClip(String),
     PlayClipFrom(String, Time),
-    PlayMulti(String, usize),
-    PlayMultiFrom(String, Time, usize),
+    PlayMulti(String, usize, String),
+    PlayMultiFrom(String, Time, usize, String),
     MultiNext,
 }
 

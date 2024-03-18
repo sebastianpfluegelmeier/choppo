@@ -12,7 +12,7 @@ use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
 
-pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Interpreter, filepath: String, extension: String) {
+pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Interpreter) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -38,8 +38,8 @@ pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Inter
         let cmd = runner.advance_time(1.0 / fps);
         let video = match cmd.clone() {
             interpreter::FrameCommand::ShowSingleFrame { file, frame } => video_loader.load(
-                &format!("{}{}{}", &filepath.clone(), &file, &extension),
-                frame,
+                &file,
+                frame
             ),
             _ => None,
         };

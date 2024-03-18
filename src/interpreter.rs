@@ -1,6 +1,4 @@
-use crate::{
-    reducer::{ClipCommand, Time},
-};
+use crate::reducer::{ClipCommand, Time};
 
 pub struct Interpreter {
     fps: f64,
@@ -25,6 +23,7 @@ enum DisplayState {
         sub: usize,
         frame: usize,
         subs_amt: usize,
+        extension: String,
     },
 }
 
@@ -71,20 +70,22 @@ impl Interpreter {
                             frame: ((time.num as f64 / time.denom as f64) * self.bpm) as usize,
                         }
                     }
-                    ClipCommand::PlayMulti(name, subs_amt) => {
+                    ClipCommand::PlayMulti(name, subs_amt, extension) => {
                         self.display_state = DisplayState::Multi {
                             file: name.clone(),
                             sub: 0,
                             subs_amt: *subs_amt,
                             frame: 0,
+                            extension: extension.clone(),
                         }
                     }
-                    ClipCommand::PlayMultiFrom(name, time, subs_amt) => {
+                    ClipCommand::PlayMultiFrom(name, time, subs_amt, extension) => {
                         self.display_state = DisplayState::Multi {
                             file: name.clone(),
                             sub: 0,
                             subs_amt: *subs_amt,
                             frame: ((time.num as f64 / time.denom as f64) * self.bpm) as usize,
+                            extension: extension.clone(),
                         }
                     }
                     ClipCommand::MultiNext => {
@@ -93,6 +94,7 @@ impl Interpreter {
                             sub,
                             subs_amt,
                             frame: _,
+                            extension: _,
                         } = &mut self.display_state
                         {
                             *sub += 1;
@@ -117,8 +119,9 @@ impl Interpreter {
                 subs_amt: _,
                 sub,
                 frame,
+                extension,
             } => FrameCommand::ShowSingleFrame {
-                file: format!("{}_{}", file.clone(), sub),
+                file: format!("{}_{}{}", file.clone(), sub, extension),
                 frame: *frame,
             },
         };
@@ -133,6 +136,7 @@ impl Interpreter {
                 sub: _,
                 subs_amt: _,
                 frame,
+                extension: _,
             } => *frame += 1,
         }
         if self.beats > self.loop_length {
