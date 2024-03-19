@@ -6,9 +6,9 @@ use std::{
 use crate::{
     parser::{
         ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression,
-        ClipExpression, DotBeatExpression, Main, MultiVideoExpression, NumberBeatExpression,
-        RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression, TimeExpression,
-        TruncatedClipExpression,
+        ClipExpression, ClipLoopExpression, DotBeatExpression, Main, MultiVideoExpression,
+        NumberBeatExpression, RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression,
+        TimeExpression, TruncatedClipExpression,
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -120,6 +120,17 @@ fn reduce_clip_expression(
             reduced_beats,
             beat_expression,
         ),
+        ClipExpression::Loop(ClipLoopExpression { clip, repetitions }) => {
+            reduce_clip_loop_expression(
+                path,
+                extension,
+                *repetitions,
+                &(*clip),
+                all_clip_expressions,
+                reduced_clips,
+                reduced_beats,
+            )
+        }
     }
 }
 
@@ -265,8 +276,12 @@ fn reduce_truncate_expression(
                     )
                 }
                 ClipCommand::PlayMultiFrom(path, time, subclips, extension) => {
-                    command.1 =
-                        ClipCommand::PlayMultiFrom(path.clone(), time + &from, *subclips, extension.clone())
+                    command.1 = ClipCommand::PlayMultiFrom(
+                        path.clone(),
+                        time + &from,
+                        *subclips,
+                        extension.clone(),
+                    )
                 }
                 ClipCommand::MultiNext => (),
             };
@@ -280,6 +295,41 @@ fn reduce_truncate_expression(
         clip.length = to;
     }
     (clip, reduced_clips)
+}
+
+fn reduce_clip_loop_expression(
+    path: &str,
+    extension: &str,
+    repetitions: usize,
+    clip: &Box<ClipExpression>,
+    all_clip_expressions: &HashMap<String, ClipExpression>,
+    reduced_clips: &HashMap<String, ReducedClip>,
+    reduced_beats: &HashMap<String, ReducedBeat>,
+) -> (ReducedClip, HashMap<String, ReducedClip>) {
+    let (clip, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip,
+        all_clip_expressions,
+        reduced_clips,
+        reduced_beats,
+    );
+    let mut clips = Vec::new();
+
+    for i in 0..repetitions {
+        let mut new_clip = clip.clone();
+        for c in &mut new_clip.commands {
+            c.0 = &c.0 + &clip.length.mul(i as isize);
+        }
+        clips.push(new_clip.commands);
+    }
+    (
+        ReducedClip {
+            commands: clips.into_iter().flatten().collect(),
+            length: clip.length.mul(repetitions as isize),
+        },
+        reduced_clips,
+    )
 }
 
 fn reduce_chain_expression(
@@ -466,6 +516,15 @@ pub struct ReducedBeat {
 pub struct Time {
     pub num: isize,
     pub denom: usize,
+}
+
+impl Time {
+    pub fn mul(&self, other: isize) -> Self {
+        Time {
+            num: self.num * other,
+            denom: self.denom,
+        }
+    }
 }
 
 impl From<Time> for f64 {

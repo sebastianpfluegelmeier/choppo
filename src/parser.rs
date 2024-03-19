@@ -263,6 +263,7 @@ pub fn parse_clip_declaration(input: &str) -> IResult<&str, Declaration> {
 #[derive(Debug, Clone)]
 pub enum ClipExpression {
     Chain(ClipChainExpression),
+    Loop(ClipLoopExpression),
     Truncated(TruncatedClipExpression),
     RawVideo(RawVideoExpression),
     MultiVideo(MultiVideoExpression),
@@ -274,6 +275,7 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
     alt((
         parse_apply_beat_expression,
         parse_clip_chain_expression,
+        parse_clip_loop_expression,
         parse_truncated_clip_expression,
         parse_raw_video_expression,
         parse_multi_video_expression,
@@ -318,6 +320,35 @@ fn parse_reference_clip_expression(input: &str) -> IResult<&str, ClipExpression>
     Ok((
         input,
         ClipExpression::Reference(ReferenceClipExpression { name: name.into() }),
+    ))
+}
+
+#[derive(Debug, Clone)]
+pub struct ClipLoopExpression {
+    pub clip: Box<ClipExpression>,
+    pub repetitions: usize,
+}
+pub fn parse_clip_loop_expression(input: &str) -> IResult<&str, ClipExpression> {
+    let (input, _) = multispace0(input)?;
+    let (input, first_part) = take_until("*")(input)?;
+    let (rest_first, clip) = parse_clip_expression(first_part)?;
+    if !rest_first.is_empty() {
+        return fail(rest_first);
+    }
+    let (input, _) = multispace0(input)?;
+    let (input, _) = char('*')(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, repetitions) = take_while_m_n(1, 1, |c: char| c.is_ascii_digit())(input)?;
+    let repetitions = repetitions
+        .parse::<usize>()
+        .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char)))?;
+    let (input, _) = multispace0(input)?;
+    Ok((
+        input,
+        ClipExpression::Loop(ClipLoopExpression {
+            clip: Box::new(clip),
+            repetitions: repetitions,
+        }),
     ))
 }
 

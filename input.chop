@@ -1,7 +1,6 @@
 directory = '/Users/sebastianpfluegelmeier/test/';
 extension = '.mp4';
 
-clip m = multi 3 'pk';
-beat b = ..-.;
-beat bb = b|b|b|b;
-bb@m
+clip a = 'a'[10:10.3];
+clip b = 'b'[10:10.3];
+b*8|a*8
