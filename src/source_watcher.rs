@@ -49,8 +49,12 @@ impl SourceWatcher {
 
 fn read_input(input: String, sender: &std::sync::mpsc::Sender<ReducedClip>) -> Result<(), ()> {
     let parsed = parse_main(&input).map_err(|_e| ())?.1;
-    println!("\n\n{:?}\n\n", parsed);
+    for declaration in &parsed.declarations {
+        println!("{:?}", declaration);
+    }
+    println!("{:?}\n", parsed.main_expression);
     let interpreted = reduce(parsed);
+    interpreted.print();
     let _ = sender.send(interpreted);
     Result::Ok(())
 }

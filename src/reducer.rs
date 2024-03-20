@@ -8,7 +8,7 @@ use crate::{
         ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression,
         ClipExpression, ClipLoopExpression, DotBeatExpression, Main, MultiVideoExpression,
         NumberBeatExpression, RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression,
-        TimeExpression, TruncatedClipExpression,
+        RestartExpression, TimeExpression, TruncatedClipExpression,
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -74,6 +74,18 @@ fn reduce_clip_expression(
     reduced_beats: &HashMap<String, ReducedBeat>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     match clip {
+        ClipExpression::Restart(RestartExpression {
+            clip_expression,
+            beat_expression,
+        }) => reduce_restart_expression(
+            path,
+            extension,
+            &(*clip_expression),
+            all_clip_expressions,
+            reduced_clips,
+            reduced_beats,
+            beat_expression,
+        ),
         ClipExpression::Chain(ClipChainExpression { clip_a, clip_b }) => reduce_chain_expression(
             path,
             extension,
@@ -199,6 +211,42 @@ fn reduce_reference_expression(
     }
 }
 
+fn reduce_restart_expression(
+    path: &str,
+    extension: &str,
+    clip_expression: &Box<ClipExpression>,
+    all_clip_expressions: &HashMap<String, ClipExpression>,
+    reduced_clips: &HashMap<String, ReducedClip>,
+    reduced_beats: &HashMap<String, ReducedBeat>,
+    beat_expression: &BeatExpression,
+) -> (ReducedClip, HashMap<String, ReducedClip>) {
+    let (mut clip, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip_expression,
+        all_clip_expressions,
+        reduced_clips,
+        reduced_beats,
+    );
+    let (mut beat, _) = reduce_beat_expression(beat_expression, &HashMap::new(), reduced_beats);
+    beat.beats.push(beat.length);
+    let left_shift = beat.beats[..beat.beats.len() - 1].iter();
+    let right_shift = beat.beats[1..].iter();
+    let lengths: Vec<Time> = left_shift.zip(right_shift).map(|(b1, b2)| {b2 - b1}).collect();
+    let beat_commands = lengths
+        .into_iter()
+        .map(|beat_time| {
+            let mut clip = clip.clone();
+            println!("{:?}", beat_time);
+            slice_clip(&mut clip, &None, &Some(beat_time));
+            clip
+        })
+        .reduce(|l, r| chain(l, r));
+    println!("{:?}", beat_commands);
+    clip.commands.sort_by_key(|b| time_to_frac(&b.0));
+    (beat_commands.unwrap_or(clip), reduced_clips)
+}
+
 fn reduce_apply_beat_expression(
     path: &str,
     extension: &str,
@@ -244,10 +292,15 @@ fn reduce_truncate_expression(
         reduced_clips,
         reduced_beats,
     );
-    let from = time_expression_to_time(&timerange.from.clone().unwrap_or(TimeExpression {
-        beat: 0,
-        sixteenth: None,
-    }));
+    let from = timerange.from.as_ref().map(|t| time_expression_to_time(&t));
+    let to = timerange.to.as_ref().map(|t| time_expression_to_time(&t));
+    slice_clip(&mut clip, &from, &to);
+    (clip, reduced_clips)
+}
+
+fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
+    let zero = Time::zero();
+    let from = from.as_ref().unwrap_or(&zero);
     for command in &mut clip.commands {
         command.0 = &command.0 - &from;
         if command.0.num < 0 {
@@ -288,13 +341,11 @@ fn reduce_truncate_expression(
             command.0 = Time { num: 0, denom: 1 };
         }
     }
-    if let Some(to) = &timerange.to {
-        let to = time_expression_to_time(to) - from;
+    if let Some(to) = to {
         clip.commands
             .retain(|c| time_to_frac(&c.0) < time_to_frac(&to));
-        clip.length = to;
+        clip.length = to.clone();
     }
-    (clip, reduced_clips)
 }
 
 fn reduce_clip_loop_expression(
@@ -357,19 +408,22 @@ fn reduce_chain_expression(
         &reduced_clips,
         reduced_beats,
     );
+    let clip = chain(clip_b, clip_a);
+    (clip, reduced_clips)
+}
+
+fn chain(clip_a: ReducedClip, mut clip_b: ReducedClip) -> ReducedClip {
     for command in &mut clip_b.commands {
         command.0 = &command.0 + &clip_a.length;
     }
-    (
-        ReducedClip {
-            commands: vec![clip_a.commands, clip_b.commands]
-                .into_iter()
-                .flatten()
-                .collect(),
-            length: &clip_a.length + &clip_b.length,
-        },
-        reduced_clips,
-    )
+    let clip = ReducedClip {
+        commands: vec![clip_a.commands, clip_b.commands]
+            .into_iter()
+            .flatten()
+            .collect(),
+        length: &clip_a.length + &clip_b.length,
+    };
+    clip
 }
 
 fn reduce_beat_expression(
@@ -497,6 +551,16 @@ pub struct ReducedClip {
     pub length: Time,
 }
 
+impl ReducedClip {
+    pub fn print(&self) {
+        println!("length {}:{}={}", self.length.num ,self.length.denom, self.length.num as f64/ self.length.denom as f64);
+        for (time, command) in &self.commands {
+            print!("time {}:{}={}", time.num ,time.denom, time.num as f64/ time.denom as f64);
+            println!("command {:?}", command);
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ClipCommand {
     PlayClip(String),
@@ -524,6 +588,10 @@ impl Time {
             num: self.num * other,
             denom: self.denom,
         }
+    }
+
+    pub fn zero() -> Self {
+        Time { num: 0, denom: 1 }
     }
 }
 

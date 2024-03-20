@@ -264,6 +264,7 @@ pub fn parse_clip_declaration(input: &str) -> IResult<&str, Declaration> {
 pub enum ClipExpression {
     Chain(ClipChainExpression),
     Loop(ClipLoopExpression),
+    Restart(RestartExpression),
     Truncated(TruncatedClipExpression),
     RawVideo(RawVideoExpression),
     MultiVideo(MultiVideoExpression),
@@ -274,6 +275,7 @@ pub enum ClipExpression {
 pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
     alt((
         parse_apply_beat_expression,
+        parse_restart_beat_expression,
         parse_clip_chain_expression,
         parse_clip_loop_expression,
         parse_truncated_clip_expression,
@@ -283,6 +285,29 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
     ))(input)
 }
 
+#[derive(Debug, Clone)]
+pub struct RestartExpression {
+    pub beat_expression: BeatExpression,
+    pub clip_expression: Box<ClipExpression>,
+}
+
+pub fn parse_restart_beat_expression(input: &str) -> IResult<&str, ClipExpression> {
+    let (input, _) = multispace0(input)?;
+    let (input, beat_expression) = parse_beat_expression(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, _) = tag(">>")(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, clip_expression) = parse_clip_expression(input)?;
+    let (input, _) = multispace0(input)?;
+
+    Ok((
+        input,
+        ClipExpression::Restart(RestartExpression {
+            beat_expression,
+            clip_expression: Box::new(clip_expression),
+        }),
+    ))
+}
 #[derive(Debug, Clone)]
 pub struct ApplyBeatExpression {
     pub beat_expression: BeatExpression,
