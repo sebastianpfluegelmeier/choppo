@@ -270,6 +270,7 @@ pub enum ClipExpression {
     MultiVideo(MultiVideoExpression),
     Reference(ReferenceClipExpression),
     ApplyBeat(ApplyBeatExpression),
+    ParenthesesClipExpression(ParenthesesClipExpression)
 }
 
 pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
@@ -282,6 +283,7 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
         parse_raw_video_expression,
         parse_multi_video_expression,
         parse_reference_clip_expression,
+        parse_parentheses_clip_expression,
     ))(input)
 }
 
@@ -345,6 +347,26 @@ fn parse_reference_clip_expression(input: &str) -> IResult<&str, ClipExpression>
     Ok((
         input,
         ClipExpression::Reference(ReferenceClipExpression { name: name.into() }),
+    ))
+}
+
+#[derive(Debug, Clone)]
+pub struct ParenthesesClipExpression {
+    pub clip: Box<ClipExpression>,
+}
+pub fn parse_parentheses_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
+    let (input, _) = multispace0(input)?;
+    let (input, _) = char('(')(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, clip) = parse_clip_expression(input)?;
+    let (input, _) = multispace0(input)?;
+    let (input, _) = char(')')(input)?;
+    let (input, _) = multispace0(input)?;
+    Ok((
+        input,
+        ClipExpression::ParenthesesClipExpression(ParenthesesClipExpression {
+            clip: Box::new(clip),
+        }),
     ))
 }
 

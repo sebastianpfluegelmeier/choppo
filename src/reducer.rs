@@ -5,10 +5,7 @@ use std::{
 
 use crate::{
     parser::{
-        ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression,
-        ClipExpression, ClipLoopExpression, DotBeatExpression, Main, MultiVideoExpression,
-        NumberBeatExpression, RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression,
-        RestartExpression, TimeExpression, TruncatedClipExpression,
+        ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression, ClipExpression, ClipLoopExpression, DotBeatExpression, Main, MultiVideoExpression, NumberBeatExpression, ParenthesesClipExpression, RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression, RestartExpression, TimeExpression, TruncatedClipExpression
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -74,6 +71,16 @@ fn reduce_clip_expression(
     reduced_beats: &HashMap<String, ReducedBeat>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     match clip {
+        ClipExpression::ParenthesesClipExpression(ParenthesesClipExpression {
+            clip,
+        }) => reduce_clip_expression(
+            path,
+            extension,
+            &(*clip),
+            all_clip_expressions,
+            reduced_clips,
+            reduced_beats,
+        ),
         ClipExpression::Restart(RestartExpression {
             clip_expression,
             beat_expression,
