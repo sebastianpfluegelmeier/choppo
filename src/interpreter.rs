@@ -5,7 +5,7 @@ pub struct Interpreter {
     time: f64,
     bpm: f64,
     beats: f64,
-    display_state: DisplayState,
+    display_state: Vec<DisplayState>,
     commands: Vec<(Time, ClipCommand)>,
     commands_idx: usize,
     loop_length: f64,
@@ -35,7 +35,7 @@ impl Interpreter {
             time: 0.0,
             beats: 0.0,
             commands_idx: 0,
-            display_state: DisplayState::None,
+            display_state: vec![DisplayState::None],
             commands,
             loop_length,
         }
@@ -46,7 +46,7 @@ impl Interpreter {
         self.loop_length = loop_length;
     }
 
-    pub fn advance_time(&mut self, seconds: f64) -> FrameCommand {
+    pub fn advance_time(&mut self, seconds: f64) -> Vec<FrameCommand> {
         'find_command: loop {
             if let Some((time, _)) = &self.commands.get(self.commands_idx) {
                 if (time.num as f64 / time.denom as f64) > self.beats {
@@ -56,22 +56,26 @@ impl Interpreter {
             if self.commands_idx > self.commands.len() {
                 break 'find_command;
             }
-            if let Some((_, command)) = &self.commands.get(self.commands_idx) {
+            if let Some((_, command)) = self.commands.get(self.commands_idx) {
+                let layer = command.layer();
+                if self.display_state.len() <= layer {
+                    self.display_state.push(DisplayState::None);
+                }
                 match command {
-                    ClipCommand::PlayClip(name) => {
-                        self.display_state = DisplayState::Single {
+                    ClipCommand::PlayClip(name, layer) => {
+                        self.display_state[*layer] = DisplayState::Single {
                             file: name.clone(),
                             frame: 0,
                         }
                     }
-                    ClipCommand::PlayClipFrom(name, time) => {
-                        self.display_state = DisplayState::Single {
+                    ClipCommand::PlayClipFrom(name, layer, time) => {
+                        self.display_state[*layer] = DisplayState::Single {
                             file: name.clone(),
                             frame: ((time.num as f64 / time.denom as f64) * self.bpm) as usize,
                         }
                     }
                     ClipCommand::PlayMulti(name, subs_amt, extension) => {
-                        self.display_state = DisplayState::Multi {
+                        self.display_state[0] = DisplayState::Multi {
                             file: name.clone(),
                             sub: 0,
                             subs_amt: *subs_amt,
@@ -80,7 +84,7 @@ impl Interpreter {
                         }
                     }
                     ClipCommand::PlayMultiFrom(name, time, subs_amt, extension) => {
-                        self.display_state = DisplayState::Multi {
+                        self.display_state[0] = DisplayState::Multi {
                             file: name.clone(),
                             sub: 0,
                             subs_amt: *subs_amt,
@@ -88,14 +92,14 @@ impl Interpreter {
                             extension: extension.clone(),
                         }
                     }
-                    ClipCommand::MultiNext => {
-                        if let DisplayState::Multi {
+                    ClipCommand::MultiNext(layer) => {
+                        if let Some(DisplayState::Multi {
                             file: _,
                             sub,
                             subs_amt,
                             frame: _,
                             extension: _,
-                        } = &mut self.display_state
+                        }) = &mut self.display_state.get_mut(*layer)
                         {
                             *sub += 1;
                             if sub >= subs_amt {
@@ -108,45 +112,51 @@ impl Interpreter {
             self.commands_idx += 1;
         }
 
-        let command = match &self.display_state {
-            DisplayState::None => FrameCommand::ShowNone,
-            DisplayState::Single { file, frame } => FrameCommand::ShowSingleFrame {
-                file: file.clone(),
-                frame: *frame,
-            },
-            DisplayState::Multi {
-                file,
-                subs_amt: _,
-                sub,
-                frame,
-                extension,
-            } => FrameCommand::ShowSingleFrame {
-                file: format!("{}_{}{}", file.clone(), sub, extension),
-                frame: *frame,
-            },
-        };
+        let mut commands = Vec::new();
+        for display_state in &self.display_state {
+            let command = match display_state {
+                DisplayState::None => FrameCommand::ShowNone,
+                DisplayState::Single { file, frame } => FrameCommand::ShowSingleFrame {
+                    file: file.clone(),
+                    frame: *frame,
+                },
+                DisplayState::Multi {
+                    file,
+                    subs_amt: _,
+                    sub,
+                    frame,
+                    extension,
+                } => FrameCommand::ShowSingleFrame {
+                    file: format!("{}_{}{}", file.clone(), sub, extension),
+                    frame: *frame,
+                },
+            };
+            commands.push(command);
+        }
 
         self.time += seconds;
         self.beats += self.fps * seconds / self.bpm;
-        match &mut self.display_state {
-            DisplayState::None => (),
-            DisplayState::Single { file: _, frame } => *frame += 1,
-            DisplayState::Multi {
-                file: _,
-                sub: _,
-                subs_amt: _,
-                frame,
-                extension: _,
-            } => *frame += 1,
+        for display_state in &mut self.display_state {
+            match display_state {
+                DisplayState::None => (),
+                DisplayState::Single { file: _, frame } => *frame += 1,
+                DisplayState::Multi {
+                    file: _,
+                    sub: _,
+                    subs_amt: _,
+                    frame,
+                    extension: _,
+                } => *frame += 1,
+            }
         }
         if self.beats > self.loop_length {
             self.beats -= self.loop_length;
             self.time = 0.0;
-            self.display_state = DisplayState::None;
+            self.display_state.clear();
             self.commands_idx = 0;
         }
 
-        command
+        return commands;
     }
 }
 

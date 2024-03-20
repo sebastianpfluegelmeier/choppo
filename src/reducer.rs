@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     parser::{
-        ApplyBeatExpression, BeatChainExpression, BeatExpression, ClipChainExpression, ClipExpression, ClipLoopExpression, DotBeatExpression, Main, MultiVideoExpression, NumberBeatExpression, ParenthesesClipExpression, RawVideoExpression, ReferenceBeatExpression, ReferenceClipExpression, RestartExpression, TimeExpression, TruncatedClipExpression
+        beats_parser::{BeatChainExpression, BeatExpression, DotBeatExpression, NumberBeatExpression, ReferenceBeatExpression}, ApplyBeatExpression, ClipChainExpression, ClipExpression, ClipLoopExpression, ClipLayerExpression, Main, MultiVideoExpression, ParenthesesClipExpression, RawVideoExpression, ReferenceClipExpression, RestartExpression, TimeExpression, TruncatedClipExpression
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -93,6 +93,15 @@ fn reduce_clip_expression(
             reduced_beats,
             beat_expression,
         ),
+        ClipExpression::Layer(ClipLayerExpression { clip_a, clip_b }) => reduce_layer_expression(
+            path,
+            extension,
+            clip_a,
+            &all_clip_expressions,
+            &reduced_clips,
+            &reduced_beats,
+            clip_b,
+        ),
         ClipExpression::Chain(ClipChainExpression { clip_a, clip_b }) => reduce_chain_expression(
             path,
             extension,
@@ -163,7 +172,7 @@ fn reduce_raw_video_expression(
         ReducedClip {
             commands: vec![(
                 Time { num: 0, denom: 1 },
-                ClipCommand::PlayClip(format!("{}{}{}", path, filename, extension)),
+                ClipCommand::PlayClip(format!("{}{}{}", path, filename, extension), 0),
             )],
             length: Time { num: 1, denom: 1 },
         },
@@ -244,12 +253,10 @@ fn reduce_restart_expression(
         .into_iter()
         .map(|beat_time| {
             let mut clip = clip.clone();
-            println!("{:?}", beat_time);
             slice_clip(&mut clip, &None, &Some(beat_time));
             clip
         })
         .reduce(|l, r| chain(l, r));
-    println!("{:?}", beat_commands);
     clip.commands.sort_by_key(|b| time_to_frac(&b.0));
     (beat_commands.unwrap_or(clip), reduced_clips)
 }
@@ -275,7 +282,7 @@ fn reduce_apply_beat_expression(
     let mut beat_commands = beat
         .beats
         .into_iter()
-        .map(|b| (b, ClipCommand::MultiNext))
+        .map(|b| (b, ClipCommand::MultiNext(0)))
         .collect();
     clip.commands.append(&mut beat_commands);
     clip.commands.sort_by_key(|b| time_to_frac(&b.0));
@@ -312,17 +319,18 @@ fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
         command.0 = &command.0 - &from;
         if command.0.num < 0 {
             match &command.1 {
-                ClipCommand::PlayClip(path) => {
+                ClipCommand::PlayClip(path, layer) => {
                     command.1 = ClipCommand::PlayClipFrom(
                         path.clone(),
+                        *layer,
                         Time {
                             num: -command.0.num,
                             denom: command.0.denom,
                         },
                     )
                 }
-                ClipCommand::PlayClipFrom(path, time) => {
-                    command.1 = ClipCommand::PlayClipFrom(path.clone(), time + &from)
+                ClipCommand::PlayClipFrom(path, layer, time) => {
+                    command.1 = ClipCommand::PlayClipFrom(path.clone(), *layer, time + &from)
                 }
                 ClipCommand::PlayMulti(path, subclips, extension) => {
                     command.1 = ClipCommand::PlayMultiFrom(
@@ -343,7 +351,7 @@ fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
                         extension.clone(),
                     )
                 }
-                ClipCommand::MultiNext => (),
+                ClipCommand::MultiNext(_) => (),
             };
             command.0 = Time { num: 0, denom: 1 };
         }
@@ -390,6 +398,49 @@ fn reduce_clip_loop_expression(
     )
 }
 
+fn reduce_layer_expression(
+    path: &str,
+    extension: &str,
+    clip_a: &Box<ClipExpression>,
+    all_clip_expressions: &HashMap<String, ClipExpression>,
+    reduced_clips: &HashMap<String, ReducedClip>,
+    reduced_beats: &HashMap<String, ReducedBeat>,
+    clip_b: &Box<ClipExpression>,
+) -> (ReducedClip, HashMap<String, ReducedClip>) {
+    let (clip_a, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip_a,
+        all_clip_expressions,
+        reduced_clips,
+        reduced_beats,
+    );
+    let max_layer = clip_a.commands.iter().map(|(_, c) | c.layer()).max().unwrap_or(0);
+    let (clip_b, reduced_clips) = reduce_clip_expression(
+        path,
+        extension,
+        clip_b,
+        all_clip_expressions,
+        &reduced_clips,
+        reduced_beats,
+    );
+    let clip = layer(clip_b, clip_a, max_layer);
+    (clip, reduced_clips)
+}
+fn layer(mut clip_a: ReducedClip, mut clip_b: ReducedClip, max_layer: usize) -> ReducedClip {
+    for command in &mut clip_b.commands {
+        command.1 = command.1.add_layer(max_layer + 1);
+    }
+    let clip = ReducedClip {
+        commands: vec![clip_a.commands, clip_b.commands]
+            .into_iter()
+            .flatten()
+            .collect(),
+        length: if f64::from(&clip_a.length) < f64::from(&clip_b.length) { clip_a.length.clone() } else {clip_b.length.clone() },
+    };
+    clip
+}
+
 fn reduce_chain_expression(
     path: &str,
     extension: &str,
@@ -407,7 +458,7 @@ fn reduce_chain_expression(
         reduced_clips,
         reduced_beats,
     );
-    let (mut clip_b, reduced_clips) = reduce_clip_expression(
+    let (clip_b, reduced_clips) = reduce_clip_expression(
         path,
         extension,
         clip_b,
@@ -570,11 +621,33 @@ impl ReducedClip {
 
 #[derive(Clone, Debug)]
 pub enum ClipCommand {
-    PlayClip(String),
-    PlayClipFrom(String, Time),
+    PlayClip(String, usize),
+    PlayClipFrom(String, usize, Time),
     PlayMulti(String, usize, String),
     PlayMultiFrom(String, Time, usize, String),
-    MultiNext,
+    MultiNext(usize),
+}
+
+impl ClipCommand {
+    pub fn layer(&self) -> usize {
+        match self {
+            ClipCommand::PlayClip(_, layer) => *layer,
+            ClipCommand::PlayClipFrom(_, layer, _) => *layer,
+            ClipCommand::PlayMulti(_, _, _) => 0,
+            ClipCommand::PlayMultiFrom(_, _, _, _) => 0,
+            ClipCommand::MultiNext(layer) => *layer,
+        }
+    }
+
+    pub fn add_layer(&self, layer: usize) -> ClipCommand{
+        match self {
+            ClipCommand::PlayClip(file, l) => ClipCommand::PlayClip(file.clone(), layer + l),
+            ClipCommand::PlayClipFrom(file, l, time) => ClipCommand::PlayClipFrom(file.clone(), layer + l, time.clone()),
+            ClipCommand::PlayMulti(_, _, _) => self.clone(),
+            ClipCommand::PlayMultiFrom(_, _, _, _) => self.clone(),
+            ClipCommand::MultiNext(l) => ClipCommand::MultiNext(layer + l),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -604,6 +677,12 @@ impl Time {
 
 impl From<Time> for f64 {
     fn from(val: Time) -> Self {
+        val.num as f64 / val.denom as f64
+    }
+}
+
+impl From<&Time> for f64 {
+    fn from(val: &Time) -> Self {
         val.num as f64 / val.denom as f64
     }
 }

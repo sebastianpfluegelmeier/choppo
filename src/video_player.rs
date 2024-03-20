@@ -1,13 +1,12 @@
-
-
-
 use std::time::{Duration, Instant};
 
+use crate::interpreter::{self, Interpreter};
 use crate::source_watcher::SourceWatcher;
 use crate::video_loader::VideoLoader;
-use crate::interpreter::{self, Interpreter};
 
 use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
+use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
@@ -32,24 +31,27 @@ pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Inter
     let mut previous_frame_time = Instant::now();
     let frame_duration = Duration::from_secs_f64(1.0 / fps);
     'mainloop: loop {
+        canvas.clear();
         if let Some(clip) = source_watcher.get_new_interpreted() {
             runner.set_commands(clip.commands, clip.length.into());
         }
-        let cmd = runner.advance_time(1.0 / fps);
-        let video = match cmd.clone() {
-            interpreter::FrameCommand::ShowSingleFrame { file, frame } => video_loader.load(
-                &file,
-                frame
-            ),
-            _ => None,
-        };
-
-        if let Some(video) = video {
-            let texture = frame_to_texture(video, target_w, target_h, &texture_creator);
-            let _ = canvas.copy(&texture, None, None);
-            canvas.present();
+        let commands = runner.advance_time(1.0 / fps);
+        for cmd in commands {
+            let video = match cmd.clone() {
+                interpreter::FrameCommand::ShowSingleFrame { file, frame } => {
+                    video_loader.load(&file, frame)
+                }
+                _ => None,
+            };
+            if let Some(video) = video {
+                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator);
+                texture.set_blend_mode(sdl2::render::BlendMode::Blend);
+                canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
+                let _ = canvas.copy(&texture, None, None);
+            }
         }
 
+                canvas.present();
         for event in sdl_context.event_pump().unwrap().poll_iter() {
             match event {
                 Event::Quit { .. }
