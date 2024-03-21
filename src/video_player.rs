@@ -5,8 +5,7 @@ use crate::source_watcher::SourceWatcher;
 use crate::video_loader::VideoLoader;
 
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::{Point, Rect};
+
 use sdl2::render::{Texture, TextureValueError};
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
@@ -48,7 +47,8 @@ pub fn play_video(
                 _ => None,
             };
             if let Some(video) = video {
-                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator).map_err(|_| ())?;
+                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator)
+                    .map_err(|_| ())?;
                 texture.set_blend_mode(sdl2::render::BlendMode::Blend);
                 canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
                 let _ = canvas.copy(&texture, None, None);
@@ -56,7 +56,7 @@ pub fn play_video(
         }
 
         canvas.present();
-        for event in sdl_context.event_pump().map_err(|e| ())?.poll_iter() {
+        for event in sdl_context.event_pump().map_err(|_e| ())?.poll_iter() {
             match event {
                 Event::Quit { .. }
                 | Event::KeyDown {

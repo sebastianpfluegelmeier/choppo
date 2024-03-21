@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::{tag, take_until, take_while_m_n},
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace0},
     combinator::{fail, opt, recognize},
-    multi::{many0, many1},
+    multi::many0,
     sequence::delimited,
     IResult,
 };
@@ -111,8 +111,6 @@ pub fn parse_beat_declaration(input: &str) -> IResult<&str, Declaration> {
     ))
 }
 
-
-
 #[derive(Debug)]
 pub struct ClipDeclaration {
     pub expression: ClipExpression,
@@ -150,7 +148,7 @@ pub enum ClipExpression {
     MultiVideo(MultiVideoExpression),
     Reference(ReferenceClipExpression),
     ApplyBeat(ApplyBeatExpression),
-    ParenthesesClipExpression(ParenthesesClipExpression)
+    ParenthesesClipExpression(ParenthesesClipExpression),
 }
 
 pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
@@ -275,7 +273,7 @@ pub fn parse_clip_loop_expression(input: &str) -> IResult<&str, ClipExpression> 
         input,
         ClipExpression::Loop(ClipLoopExpression {
             clip: Box::new(clip),
-            repetitions: repetitions,
+            repetitions,
         }),
     ))
 }

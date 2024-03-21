@@ -26,12 +26,9 @@ impl VideoLoader {
                 reader.stop();
                 let mut reader =
                     VideoReader::new(name.to_string(), frame, self.target_w, self.target_h);
-                if reader.is_none() {
-                    return None;
-                }
+                reader.as_ref()?;
                 let frame_ = reader.as_mut()?.read_next_frame();
-                self.readers
-                    .insert(name.to_string(), (reader?, frame));
+                self.readers.insert(name.to_string(), (reader?, frame));
                 frame_
             } else {
                 *last_frame = frame;

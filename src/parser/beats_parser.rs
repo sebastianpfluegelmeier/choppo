@@ -1,11 +1,9 @@
-
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while_m_n},
-    character::complete::{alpha1, alphanumeric1, char, digit1, multispace0},
-    combinator::{fail, opt, recognize},
-    multi::{many0, many1},
-    sequence::delimited,
+    character::complete::{alphanumeric1, char, multispace0},
+    combinator::fail,
+    multi::many1,
     IResult,
 };
 
@@ -18,7 +16,6 @@ pub enum BeatExpression {
 }
 
 pub fn parse_beat_expression(input: &str) -> IResult<&str, BeatExpression> {
-
     let (input, beat_expression) = alt((
         parse_beat_chain_expression,
         parse_dot_beat_expression,

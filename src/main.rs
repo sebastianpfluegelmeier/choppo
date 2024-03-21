@@ -1,15 +1,8 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use std::time::{Duration, Instant};
-
 use crate::interpreter::Interpreter;
 use crate::source_watcher::SourceWatcher;
-use crate::video_loader::VideoLoader;
 
-use sdl2::keyboard::Keycode;
-use sdl2::render::Texture;
-use sdl2::surface::Surface;
-use sdl2::{event::Event, pixels::PixelFormatEnum};
 use std::env;
 use video_player::play_video;
 

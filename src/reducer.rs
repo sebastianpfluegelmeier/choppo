@@ -5,7 +5,13 @@ use std::{
 
 use crate::{
     parser::{
-        beats_parser::{BeatChainExpression, BeatExpression, DotBeatExpression, NumberBeatExpression, ReferenceBeatExpression}, ApplyBeatExpression, ClipChainExpression, ClipExpression, ClipLoopExpression, ClipLayerExpression, Main, MultiVideoExpression, ParenthesesClipExpression, RawVideoExpression, ReferenceClipExpression, RestartExpression, TimeExpression, TruncatedClipExpression
+        beats_parser::{
+            BeatChainExpression, BeatExpression, DotBeatExpression, NumberBeatExpression,
+            ReferenceBeatExpression,
+        },
+        ApplyBeatExpression, ClipChainExpression, ClipExpression, ClipLayerExpression,
+        ClipLoopExpression, Main, MultiVideoExpression, ParenthesesClipExpression,
+        RawVideoExpression, ReferenceClipExpression, RestartExpression, TruncatedClipExpression,
     },
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
@@ -71,23 +77,23 @@ fn reduce_clip_expression(
     reduced_beats: &HashMap<String, ReducedBeat>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     match clip {
-        ClipExpression::ParenthesesClipExpression(ParenthesesClipExpression {
-            clip,
-        }) => reduce_clip_expression(
-            path,
-            extension,
-            &(*clip),
-            all_clip_expressions,
-            reduced_clips,
-            reduced_beats,
-        ),
+        ClipExpression::ParenthesesClipExpression(ParenthesesClipExpression { clip }) => {
+            reduce_clip_expression(
+                path,
+                extension,
+                clip,
+                all_clip_expressions,
+                reduced_clips,
+                reduced_beats,
+            )
+        }
         ClipExpression::Restart(RestartExpression {
             clip_expression,
             beat_expression,
         }) => reduce_restart_expression(
             path,
             extension,
-            &(*clip_expression),
+            clip_expression,
             all_clip_expressions,
             reduced_clips,
             reduced_beats,
@@ -97,18 +103,18 @@ fn reduce_clip_expression(
             path,
             extension,
             clip_a,
-            &all_clip_expressions,
-            &reduced_clips,
-            &reduced_beats,
+            all_clip_expressions,
+            reduced_clips,
+            reduced_beats,
             clip_b,
         ),
         ClipExpression::Chain(ClipChainExpression { clip_a, clip_b }) => reduce_chain_expression(
             path,
             extension,
             clip_a,
-            &all_clip_expressions,
-            &reduced_clips,
-            &reduced_beats,
+            all_clip_expressions,
+            reduced_clips,
+            reduced_beats,
             clip_b,
         ),
         ClipExpression::Truncated(TruncatedClipExpression { clip, timerange }) => {
@@ -116,25 +122,25 @@ fn reduce_clip_expression(
                 path,
                 extension,
                 clip,
-                &all_clip_expressions,
-                &reduced_clips,
-                &reduced_beats,
+                all_clip_expressions,
+                reduced_clips,
+                reduced_beats,
                 timerange,
             )
         }
         ClipExpression::RawVideo(RawVideoExpression { filename }) => {
-            reduce_raw_video_expression(path, extension, filename, &reduced_clips)
+            reduce_raw_video_expression(path, extension, filename, reduced_clips)
         }
         ClipExpression::MultiVideo(MultiVideoExpression { filename, subclips }) => {
-            reduce_multi_video_expression(path, extension, filename, subclips, &reduced_clips)
+            reduce_multi_video_expression(path, extension, filename, subclips, reduced_clips)
         }
         ClipExpression::Reference(ReferenceClipExpression { name }) => reduce_reference_expression(
             path,
             extension,
-            &reduced_clips,
+            reduced_clips,
             name,
-            &all_clip_expressions,
-            &reduced_beats,
+            all_clip_expressions,
+            reduced_beats,
         ),
         ClipExpression::ApplyBeat(ApplyBeatExpression {
             beat_expression,
@@ -142,7 +148,7 @@ fn reduce_clip_expression(
         }) => reduce_apply_beat_expression(
             path,
             extension,
-            &(*clip_expression),
+            clip_expression,
             all_clip_expressions,
             reduced_clips,
             reduced_beats,
@@ -153,7 +159,7 @@ fn reduce_clip_expression(
                 path,
                 extension,
                 *repetitions,
-                &(*clip),
+                clip,
                 all_clip_expressions,
                 reduced_clips,
                 reduced_beats,
@@ -248,7 +254,10 @@ fn reduce_restart_expression(
     beat.beats.push(beat.length);
     let left_shift = beat.beats[..beat.beats.len() - 1].iter();
     let right_shift = beat.beats[1..].iter();
-    let lengths: Vec<Time> = left_shift.zip(right_shift).map(|(b1, b2)| {b2 - b1}).collect();
+    let lengths: Vec<Time> = left_shift
+        .zip(right_shift)
+        .map(|(b1, b2)| b2 - b1)
+        .collect();
     let beat_commands = lengths
         .into_iter()
         .map(|beat_time| {
@@ -256,7 +265,7 @@ fn reduce_restart_expression(
             slice_clip(&mut clip, &None, &Some(beat_time));
             clip
         })
-        .reduce(|l, r| chain(l, r));
+        .reduce(chain);
     clip.commands.sort_by_key(|b| time_to_frac(&b.0));
     (beat_commands.unwrap_or(clip), reduced_clips)
 }
@@ -306,8 +315,8 @@ fn reduce_truncate_expression(
         reduced_clips,
         reduced_beats,
     );
-    let from = timerange.from.as_ref().map(|t| time_expression_to_time(&t));
-    let to = timerange.to.as_ref().map(|t| time_expression_to_time(&t));
+    let from = timerange.from.as_ref().map(time_expression_to_time);
+    let to = timerange.to.as_ref().map(time_expression_to_time);
     slice_clip(&mut clip, &from, &to);
     (clip, reduced_clips)
 }
@@ -358,7 +367,7 @@ fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
     }
     if let Some(to) = to {
         clip.commands
-            .retain(|c| time_to_frac(&c.0) < time_to_frac(&to));
+            .retain(|c| time_to_frac(&c.0) < time_to_frac(to));
         clip.length = to.clone();
     }
 }
@@ -415,7 +424,12 @@ fn reduce_layer_expression(
         reduced_clips,
         reduced_beats,
     );
-    let max_layer = clip_a.commands.iter().map(|(_, c) | c.layer()).max().unwrap_or(0);
+    let max_layer = clip_a
+        .commands
+        .iter()
+        .map(|(_, c)| c.layer())
+        .max()
+        .unwrap_or(0);
     let (clip_b, reduced_clips) = reduce_clip_expression(
         path,
         extension,
@@ -427,18 +441,22 @@ fn reduce_layer_expression(
     let clip = layer(clip_b, clip_a, max_layer);
     (clip, reduced_clips)
 }
-fn layer(mut clip_a: ReducedClip, mut clip_b: ReducedClip, max_layer: usize) -> ReducedClip {
+fn layer(clip_a: ReducedClip, mut clip_b: ReducedClip, max_layer: usize) -> ReducedClip {
     for command in &mut clip_b.commands {
         command.1 = command.1.add_layer(max_layer + 1);
     }
-    let clip = ReducedClip {
+
+    ReducedClip {
         commands: vec![clip_a.commands, clip_b.commands]
             .into_iter()
             .flatten()
             .collect(),
-        length: if f64::from(&clip_a.length) < f64::from(&clip_b.length) { clip_a.length.clone() } else {clip_b.length.clone() },
-    };
-    clip
+        length: if f64::from(&clip_a.length) < f64::from(&clip_b.length) {
+            clip_a.length.clone()
+        } else {
+            clip_b.length.clone()
+        },
+    }
 }
 
 fn reduce_chain_expression(
@@ -474,14 +492,14 @@ fn chain(clip_a: ReducedClip, mut clip_b: ReducedClip) -> ReducedClip {
     for command in &mut clip_b.commands {
         command.0 = &command.0 + &clip_a.length;
     }
-    let clip = ReducedClip {
+
+    ReducedClip {
         commands: vec![clip_a.commands, clip_b.commands]
             .into_iter()
             .flatten()
             .collect(),
         length: &clip_a.length + &clip_b.length,
-    };
-    clip
+    }
 }
 
 fn reduce_beat_expression(
@@ -611,9 +629,19 @@ pub struct ReducedClip {
 
 impl ReducedClip {
     pub fn print(&self) {
-        println!("length {}:{}={}", self.length.num ,self.length.denom, self.length.num as f64/ self.length.denom as f64);
+        println!(
+            "length {}:{}={}",
+            self.length.num,
+            self.length.denom,
+            self.length.num as f64 / self.length.denom as f64
+        );
         for (time, command) in &self.commands {
-            print!("time {}:{}={}", time.num ,time.denom, time.num as f64/ time.denom as f64);
+            print!(
+                "time {}:{}={}",
+                time.num,
+                time.denom,
+                time.num as f64 / time.denom as f64
+            );
             println!("command {:?}", command);
         }
     }
@@ -639,10 +667,12 @@ impl ClipCommand {
         }
     }
 
-    pub fn add_layer(&self, layer: usize) -> ClipCommand{
+    pub fn add_layer(&self, layer: usize) -> ClipCommand {
         match self {
             ClipCommand::PlayClip(file, l) => ClipCommand::PlayClip(file.clone(), layer + l),
-            ClipCommand::PlayClipFrom(file, l, time) => ClipCommand::PlayClipFrom(file.clone(), layer + l, time.clone()),
+            ClipCommand::PlayClipFrom(file, l, time) => {
+                ClipCommand::PlayClipFrom(file.clone(), layer + l, time.clone())
+            }
             ClipCommand::PlayMulti(_, _, _) => self.clone(),
             ClipCommand::PlayMultiFrom(_, _, _, _) => self.clone(),
             ClipCommand::MultiNext(l) => ClipCommand::MultiNext(layer + l),

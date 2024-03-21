@@ -1,6 +1,5 @@
 extern crate ffmpeg_next as ffmpeg;
 
-use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
@@ -9,7 +8,6 @@ use ffmpeg::format::{input, Pixel};
 use ffmpeg::frame::Video;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling::{context::Context, flag::Flags};
-use ffmpeg_sys_next::{AVSEEK_FLAG_ANY, AVSEEK_FORCE};
 
 pub struct VideoReader {
     scaler: Context,
@@ -108,7 +106,7 @@ impl VideoReader {
     pub fn read_next_frame(&mut self) -> Option<Video> {
         let _ = self.sender.send(ToVideoThread::LoadFrame);
         loop {
-            for (frame, video) in self.receiver.try_iter() {
+            for (_frame, video) in self.receiver.try_iter() {
                 self.buffer.push(video);
             }
             if !self.buffer.is_empty() {

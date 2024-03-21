@@ -1,6 +1,6 @@
 use fraction::Fraction;
 
-use crate::{reducer::Time, parser::TimeExpression};
+use crate::{parser::TimeExpression, reducer::Time};
 
 pub fn frac_to_time(frac: &fraction::prelude::GenericFraction<u64>) -> Time {
     Time {

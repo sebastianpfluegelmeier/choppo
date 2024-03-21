@@ -156,7 +156,7 @@ impl Interpreter {
             self.commands_idx = 0;
         }
 
-        return commands;
+        commands
     }
 }
 
