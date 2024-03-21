@@ -83,7 +83,7 @@ impl VideoReader {
                     if frames_to_read > 0 {
                         for (stream, packet) in ictx.packets() {
                             if stream.index() == video_stream_index {
-                                decoder.send_packet(&packet).unwrap();
+                                let _ = decoder.send_packet(&packet);
                                 frames_to_read -= 1;
                                 break;
                             }
@@ -117,7 +117,7 @@ impl VideoReader {
         }
         if let Some(frame) = self.buffer.pop() {
             let mut rgb_frame = Video::empty();
-            self.scaler.run(&frame, &mut rgb_frame).unwrap();
+            let _ = self.scaler.run(&frame, &mut rgb_frame);
             Some(rgb_frame)
         } else {
             None

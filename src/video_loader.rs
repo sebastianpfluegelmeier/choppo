@@ -29,9 +29,9 @@ impl VideoLoader {
                 if reader.is_none() {
                     return None;
                 }
-                let frame_ = reader.as_mut().unwrap().read_next_frame();
+                let frame_ = reader.as_mut()?.read_next_frame();
                 self.readers
-                    .insert(name.to_string(), (reader.unwrap(), frame));
+                    .insert(name.to_string(), (reader?, frame));
                 frame_
             } else {
                 *last_frame = frame;
@@ -41,8 +41,7 @@ impl VideoLoader {
             self.readers.insert(
                 name.to_string(),
                 (
-                    VideoReader::new(name.to_string(), frame, self.target_w, self.target_h)
-                        .unwrap(),
+                    VideoReader::new(name.to_string(), frame, self.target_w, self.target_h)?,
                     frame,
                 ),
             );

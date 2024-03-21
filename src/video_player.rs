@@ -7,11 +7,15 @@ use crate::video_loader::VideoLoader;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
-use sdl2::render::Texture;
+use sdl2::render::{Texture, TextureValueError};
 use sdl2::surface::Surface;
 use sdl2::{event::Event, pixels::PixelFormatEnum};
 
-pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Interpreter) {
+pub fn play_video(
+    fps: f64,
+    mut source_watcher: SourceWatcher,
+    mut runner: Interpreter,
+) -> Result<(), ()> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -44,15 +48,15 @@ pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Inter
                 _ => None,
             };
             if let Some(video) = video {
-                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator);
+                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator).map_err(|_| ())?;
                 texture.set_blend_mode(sdl2::render::BlendMode::Blend);
                 canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
                 let _ = canvas.copy(&texture, None, None);
             }
         }
 
-                canvas.present();
-        for event in sdl_context.event_pump().unwrap().poll_iter() {
+        canvas.present();
+        for event in sdl_context.event_pump().map_err(|e| ())?.poll_iter() {
             match event {
                 Event::Quit { .. }
                 | Event::KeyDown {
@@ -72,6 +76,7 @@ pub fn play_video(fps: f64, mut source_watcher: SourceWatcher, mut runner: Inter
         }
         previous_frame_time = Instant::now();
     }
+    Ok(())
 }
 
 fn frame_to_texture(
@@ -79,7 +84,7 @@ fn frame_to_texture(
     target_w: u32,
     target_h: u32,
     texture_creator: &sdl2::render::TextureCreator<sdl2::video::WindowContext>,
-) -> Texture<'_> {
+) -> Result<Texture<'_>, TextureValueError> {
     let stride = rgb_frame.stride(0);
 
     let data = rgb_frame.data_mut(0);
@@ -92,6 +97,6 @@ fn frame_to_texture(
         PixelFormatEnum::RGBA32,
     )
     .unwrap();
-    let texture = Texture::from_surface(&surface, texture_creator).unwrap();
-    texture
+    let texture = Texture::from_surface(&surface, texture_creator)?;
+    Ok(texture)
 }
