@@ -107,6 +107,9 @@ impl Interpreter {
                             }
                         }
                     }
+                    ClipCommand::Stop(layer) => {
+                        self.display_state[*layer] = DisplayState::None
+                    },
                 };
             }
             self.commands_idx += 1;

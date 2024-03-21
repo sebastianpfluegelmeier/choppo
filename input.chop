@@ -2,4 +2,4 @@ directory = '/Users/sebastianpfluegelmeier/test/';
 extension = '.mp4';
 beat b = .-...---.---;
 clip a = 'p_0'[4:8];
-'t':'a'[4:8]
+(-|'a'):'b'[:9]

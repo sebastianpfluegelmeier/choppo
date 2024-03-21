@@ -77,6 +77,7 @@ fn reduce_clip_expression(
     reduced_beats: &HashMap<String, ReducedBeat>,
 ) -> (ReducedClip, HashMap<String, ReducedClip>) {
     match clip {
+        ClipExpression::Empty => (reduce_empty_expression(), reduced_clips.clone()),
         ClipExpression::ParenthesesClipExpression(ParenthesesClipExpression { clip }) => {
             reduce_clip_expression(
                 path,
@@ -165,6 +166,13 @@ fn reduce_clip_expression(
                 reduced_beats,
             )
         }
+    }
+}
+
+fn reduce_empty_expression() -> ReducedClip {
+    ReducedClip {
+        commands: vec![(Time::zero(), ClipCommand::Stop(0))],
+        length: Time { num: 1, denom: 1 },
     }
 }
 
@@ -361,6 +369,7 @@ fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
                     )
                 }
                 ClipCommand::MultiNext(_) => (),
+                ClipCommand::Stop(_) => (),
             };
             command.0 = Time { num: 0, denom: 1 };
         }
@@ -451,7 +460,7 @@ fn layer(clip_a: ReducedClip, mut clip_b: ReducedClip, max_layer: usize) -> Redu
             .into_iter()
             .flatten()
             .collect(),
-        length: if f64::from(&clip_a.length) < f64::from(&clip_b.length) {
+        length: if f64::from(&clip_a.length) > f64::from(&clip_b.length) {
             clip_a.length.clone()
         } else {
             clip_b.length.clone()
@@ -653,6 +662,7 @@ pub enum ClipCommand {
     PlayClipFrom(String, usize, Time),
     PlayMulti(String, usize, String),
     PlayMultiFrom(String, Time, usize, String),
+    Stop(usize),
     MultiNext(usize),
 }
 
@@ -664,6 +674,7 @@ impl ClipCommand {
             ClipCommand::PlayMulti(_, _, _) => 0,
             ClipCommand::PlayMultiFrom(_, _, _, _) => 0,
             ClipCommand::MultiNext(layer) => *layer,
+            ClipCommand::Stop(layer) => *layer,
         }
     }
 
@@ -676,6 +687,7 @@ impl ClipCommand {
             ClipCommand::PlayMulti(_, _, _) => self.clone(),
             ClipCommand::PlayMultiFrom(_, _, _, _) => self.clone(),
             ClipCommand::MultiNext(l) => ClipCommand::MultiNext(layer + l),
+            ClipCommand::Stop(l) => ClipCommand::Stop(l + layer),
         }
     }
 }
@@ -686,7 +698,7 @@ pub struct ReducedBeat {
     pub length: Time,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Time {
     pub num: isize,
     pub denom: usize,

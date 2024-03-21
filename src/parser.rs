@@ -139,6 +139,7 @@ pub fn parse_clip_declaration(input: &str) -> IResult<&str, Declaration> {
 
 #[derive(Debug, Clone)]
 pub enum ClipExpression {
+    Empty,
     Chain(ClipChainExpression),
     Layer(ClipLayerExpression),
     Loop(ClipLoopExpression),
@@ -159,11 +160,23 @@ pub fn parse_clip_expression(input: &str) -> IResult<&str, ClipExpression> {
         parse_layer_expression,
         parse_clip_loop_expression,
         parse_truncated_clip_expression,
-        parse_raw_video_expression,
-        parse_multi_video_expression,
-        parse_reference_clip_expression,
         parse_parentheses_clip_expression,
+        parse_multi_video_expression,
+        parse_raw_video_expression,
+        parse_reference_clip_expression,
+        parse_empty_expression,
     ))(input)
+}
+
+pub fn parse_empty_expression(input: &str) -> IResult<&str, ClipExpression> {
+    let (input, _) = multispace0(input)?;
+    let (input, _) = tag("-")(input)?;
+    let (input, _) = multispace0(input)?;
+
+    Ok((
+        input,
+        ClipExpression::Empty,
+    ))
 }
 
 #[derive(Debug, Clone)]
