@@ -42,6 +42,7 @@ impl Interpreter {
     }
 
     pub fn set_commands(&mut self, commands: Vec<(Time, ClipCommand)>, loop_length: f64) {
+        println!("{:?}", commands);
         self.commands = commands;
         self.loop_length = loop_length;
     }

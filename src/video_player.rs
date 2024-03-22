@@ -39,10 +39,11 @@ pub fn play_video(
             runner.set_commands(clip.commands, clip.length.into());
         }
         let commands = runner.advance_time(1.0 / fps);
+        let mut layer = 0;
         for cmd in commands {
             let video = match cmd.clone() {
                 interpreter::FrameCommand::ShowSingleFrame { file, frame } => {
-                    video_loader.load(&file, frame)
+                    video_loader.load(&file, frame, layer)
                 }
                 _ => None,
             };
@@ -53,6 +54,7 @@ pub fn play_video(
                 canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
                 let _ = canvas.copy(&texture, None, None);
             }
+            layer += 1;
         }
 
         canvas.present();
@@ -73,6 +75,8 @@ pub fn play_video(
         if elapsed_frame_time < frame_duration {
             let sleep_time = frame_duration - elapsed_frame_time;
             std::thread::sleep(sleep_time);
+        } else {
+            println!("too slow, {:?} overtime", elapsed_frame_time - frame_duration);
         }
         previous_frame_time = Instant::now();
     }

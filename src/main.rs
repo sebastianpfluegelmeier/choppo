@@ -25,6 +25,6 @@ fn main() -> Result<(), ffmpeg::Error> {
     let fps = 60.0;
     let runner = Interpreter::new(fps, 120.0, Vec::new(), 1.0);
 
-    play_video(fps, source_watcher, runner);
+    let _ = play_video(fps, source_watcher, runner);
     Ok(())
 }
