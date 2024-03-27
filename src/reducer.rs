@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::{Add, Sub},
 };
 
@@ -16,7 +16,7 @@ use crate::{
     util::{frac_to_time, time_expression_to_time, time_to_frac},
 };
 
-pub fn reduce(input: Main) -> ReducedClip {
+pub fn reduce(input: Main, available_files: &HashSet<String>) -> ReducedClip {
     let beats: HashMap<String, BeatExpression> = input
         .declarations
         .iter()
@@ -57,15 +57,36 @@ pub fn reduce(input: Main) -> ReducedClip {
             reduced_clips.insert(name.clone(), result);
             reduced_clips
         });
-    reduce_clip_expression(
+    let (result, _) = reduce_clip_expression(
         &input.directory_declaration.directory,
         &input.extension_declaration.extension,
         &input.main_expression,
         &clips,
         &reduced_clips,
         &reduced_beats,
-    )
-    .0
+    );
+    for (_, cmd) in &result.commands {
+        let files = match cmd {
+            ClipCommand::PlayClip(file, _) => vec![file.clone()],
+            ClipCommand::PlayClipFrom(file, _, _) => vec![file.clone()],
+            ClipCommand::PlayMulti(file, num, extension) => (0..*num)
+                .into_iter()
+                .map(|n| format!("{}{}{}", file, n, extension))
+                .collect(),
+            ClipCommand::PlayMultiFrom(file, _, num, extension) => (0..*num)
+                .into_iter()
+                .map(|n| format!("{}{}{}", file, n, extension))
+                .collect(),
+            ClipCommand::Stop(_) => Vec::new(),
+            ClipCommand::MultiNext(_) => Vec::new(),
+        };
+        for file in files {
+            if !available_files.contains(&file) {
+                println!("file {} does not exist", file);
+            }
+        }
+    }
+    result
 }
 
 fn reduce_clip_expression(

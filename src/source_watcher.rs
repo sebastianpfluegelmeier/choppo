@@ -1,11 +1,14 @@
+use ffmpeg_sys_next::AVAdler;
 use filetime::FileTime;
+use std::fs;
+use std::path::PathBuf;
 
 use crate::{
     parser::parse_main,
     reducer::{reduce, ReducedClip},
 };
 use std::{
-    fs,
+    collections::HashSet,
     sync::mpsc::{channel, Receiver},
     thread::{self, JoinHandle},
 };
@@ -62,10 +65,32 @@ impl SourceWatcher {
     }
 }
 
-fn read_input(input: String, sender: &std::sync::mpsc::Sender<ReducedClip>) -> Result<(), ()> {
+fn read_file_paths_in_directory(path: &str) -> HashSet<String> {
+    let mut file_paths = Vec::new();
+
+    for entry in fs::read_dir(path).unwrap() {
+        if entry.is_err() {
+            continue;
+        }
+        let entry = entry.unwrap();
+        let file_path = entry.path();
+
+        if file_path.is_file() {
+            let path = file_path.to_str().unwrap_or_default().to_string();
+            file_paths.push(path);
+        }
+    }
+
+    file_paths.into_iter().collect()
+}
+
+fn read_input(
+    input: String,
+    sender: &std::sync::mpsc::Sender<ReducedClip>,
+) -> Result<(), ()> {
     let parsed = parse_main(&input).map_err(|_e| ())?.1;
-    let reduced = reduce(parsed);
-    reduced.print();
+    let available_files = read_file_paths_in_directory(&parsed.directory_declaration.directory);
+    let reduced = reduce(parsed, &available_files);
     let _ = sender.send(reduced);
     Result::Ok(())
 }
