@@ -1,5 +1,5 @@
-use sdl2::{event::Event, keyboard::Keycode, sys::KeyCode};
-use std::sync::mpsc::{Receiver, Sender};
+use sdl2::{event::Event, keyboard::Keycode};
+
 
 pub struct BpmController {
     bpm: f64,
@@ -68,8 +68,8 @@ impl BpmController {
     }
 
     pub fn get_bpm(&self) -> f64 {
-        let bpm = self.bpm + self.temp_bpm_offset;
-        bpm
+        
+        self.bpm + self.temp_bpm_offset
     }
 
     pub fn get_reset(&mut self) -> bool {

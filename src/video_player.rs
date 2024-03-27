@@ -1,14 +1,14 @@
-use std::sync::mpsc::Receiver;
-use std::thread;
-use std::time::{Duration, Instant};
 
-use crate::bpm_controller::{BpmController, BpmMessage};
+
+use std::time::{Duration};
+
+use crate::bpm_controller::{BpmController};
 use crate::interpreter::{self, Interpreter};
 use crate::source_watcher::SourceWatcher;
-use crate::time_controller::{self, TimeController};
+use crate::time_controller::{TimeController};
 use crate::video_loader::VideoLoader;
 
-use sdl2::event::EventType;
+
 use sdl2::keyboard::Keycode;
 
 use sdl2::render::{Texture, TextureValueError};
@@ -37,7 +37,7 @@ pub fn play_video(
 
     let texture_creator = canvas.texture_creator();
     let mut video_loader = VideoLoader::new(target_w, target_h);
-    let frame_duration = Duration::from_secs_f64(1.0 / fps);
+    let _frame_duration = Duration::from_secs_f64(1.0 / fps);
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut time_controller = TimeController::new(fps);
     'mainloop: loop {

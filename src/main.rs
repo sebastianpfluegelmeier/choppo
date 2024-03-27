@@ -4,7 +4,7 @@ use crate::interpreter::Interpreter;
 use crate::source_watcher::SourceWatcher;
 
 use bpm_controller::BpmController;
-use std::{env, sync::mpsc::channel, thread};
+use std::{env};
 use video_player::play_video;
 
 mod interpreter;

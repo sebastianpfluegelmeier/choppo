@@ -18,7 +18,7 @@ pub struct SourceWatcher {
 
 impl SourceWatcher {
     pub fn new(path: String) -> Self {
-        let (sender, receiver) = channel();
+        let (_sender, receiver) = channel();
         let handle = thread::spawn(||{});
         Self { receiver, handle, path}
     }
