@@ -47,6 +47,17 @@ impl Interpreter {
         self.loop_length = loop_length;
     }
 
+    pub fn set_bpm(&mut self, bpm: f64) {
+        self.bpm = bpm;
+    }
+
+    pub fn reset_beat(&mut self) {
+        self.beats = 0.0;
+        self.time = 0.0;
+        self.display_state.clear();
+        self.commands_idx = 0;
+    }
+
     pub fn advance_time(&mut self, seconds: f64) -> Vec<FrameCommand> {
         'find_command: loop {
             if let Some((time, _)) = &self.commands.get(self.commands_idx) {
@@ -108,9 +119,7 @@ impl Interpreter {
                             }
                         }
                     }
-                    ClipCommand::Stop(layer) => {
-                        self.display_state[*layer] = DisplayState::None
-                    },
+                    ClipCommand::Stop(layer) => self.display_state[*layer] = DisplayState::None,
                 };
             }
             self.commands_idx += 1;
@@ -139,7 +148,7 @@ impl Interpreter {
         }
 
         self.time += seconds;
-        self.beats += self.fps * seconds / self.bpm;
+        self.beats += self.bpm * seconds / (self.fps * 4.0);
         for display_state in &mut self.display_state {
             match display_state {
                 DisplayState::None => (),

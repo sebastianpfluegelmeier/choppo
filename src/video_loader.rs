@@ -28,7 +28,8 @@ impl VideoLoader {
                     VideoReader::new(name.to_string(), frame, self.target_w, self.target_h);
                 reader.as_ref()?;
                 let frame_ = reader.as_mut()?.read_next_frame();
-                self.readers.insert((layer, name.to_string()), (reader?, frame));
+                self.readers
+                    .insert((layer, name.to_string()), (reader?, frame));
                 frame_
             } else {
                 *last_frame = frame;

@@ -1,9 +1,14 @@
+use std::sync::mpsc::Receiver;
+use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::bpm_controller::{BpmController, BpmMessage};
 use crate::interpreter::{self, Interpreter};
 use crate::source_watcher::SourceWatcher;
+use crate::time_controller::{self, TimeController};
 use crate::video_loader::VideoLoader;
 
+use sdl2::event::EventType;
 use sdl2::keyboard::Keycode;
 
 use sdl2::render::{Texture, TextureValueError};
@@ -14,6 +19,7 @@ pub fn play_video(
     fps: f64,
     mut source_watcher: SourceWatcher,
     mut runner: Interpreter,
+    mut bpm_controller: BpmController,
 ) -> Result<(), ()> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -31,34 +37,47 @@ pub fn play_video(
 
     let texture_creator = canvas.texture_creator();
     let mut video_loader = VideoLoader::new(target_w, target_h);
-    let mut previous_frame_time = Instant::now();
     let frame_duration = Duration::from_secs_f64(1.0 / fps);
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut time_controller = TimeController::new(fps);
     'mainloop: loop {
-        canvas.clear();
+        time_controller.frame_start();
+
+        if bpm_controller.get_quit() {
+            break 'mainloop;
+        }
+        if bpm_controller.get_reset() {
+            runner.reset_beat();
+        }
+        runner.set_bpm(bpm_controller.get_bpm());
+        bpm_controller.tick();
         if let Some(clip) = source_watcher.get_new_interpreted() {
             runner.set_commands(clip.commands, clip.length.into());
         }
         let commands = runner.advance_time(1.0 / fps);
-        let mut layer = 0;
-        for cmd in commands {
-            let video = match cmd.clone() {
-                interpreter::FrameCommand::ShowSingleFrame { file, frame } => {
-                    video_loader.load(&file, frame, layer)
+        if !time_controller.skip_frame() {
+            canvas.clear();
+            let mut layer = 0;
+            for cmd in commands {
+                let video = match cmd.clone() {
+                    interpreter::FrameCommand::ShowSingleFrame { file, frame } => {
+                        video_loader.load(&file, frame, layer)
+                    }
+                    _ => None,
+                };
+                if let Some(video) = video {
+                    let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator)
+                        .map_err(|_| ())?;
+                    texture.set_blend_mode(sdl2::render::BlendMode::Blend);
+                    canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
+                    let _ = canvas.copy(&texture, None, None);
                 }
-                _ => None,
-            };
-            if let Some(video) = video {
-                let mut texture = frame_to_texture(video, target_w, target_h, &texture_creator)
-                    .map_err(|_| ())?;
-                texture.set_blend_mode(sdl2::render::BlendMode::Blend);
-                canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
-                let _ = canvas.copy(&texture, None, None);
+                layer += 1;
             }
-            layer += 1;
-        }
+            canvas.present();
+        } 
 
-        canvas.present();
-        for event in sdl_context.event_pump().map_err(|_e| ())?.poll_iter() {
+        for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
                 | Event::KeyDown {
@@ -67,18 +86,11 @@ pub fn play_video(
                 } => {
                     break 'mainloop;
                 }
+                Event::KeyDown { .. } => bpm_controller.consume_event(&event),
+                Event::KeyUp { .. } => bpm_controller.consume_event(&event),
                 _ => {}
             }
         }
-
-        let elapsed_frame_time = previous_frame_time.elapsed();
-        if elapsed_frame_time < frame_duration {
-            let sleep_time = frame_duration - elapsed_frame_time;
-            std::thread::sleep(sleep_time);
-        } else {
-            println!("too slow, {:?} overtime", elapsed_frame_time - frame_duration);
-        }
-        previous_frame_time = Instant::now();
     }
     Ok(())
 }
