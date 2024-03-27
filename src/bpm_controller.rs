@@ -53,12 +53,12 @@ impl BpmController {
                 println!("bpm: {:.2}", self.bpm);
             }
             if self.left {
-                self.temp_bpm_offset += 0.03;
-                self.temp_bpm_offset = self.temp_bpm_offset.min(20.0);
+                self.temp_bpm_offset -= 0.1;
+                self.temp_bpm_offset = self.temp_bpm_offset.max(-20.0);
             }
             if self.right {
-                self.temp_bpm_offset -= 0.03;
-                self.temp_bpm_offset = self.temp_bpm_offset.max(-20.0);
+                self.temp_bpm_offset += 0.1;
+                self.temp_bpm_offset = self.temp_bpm_offset.min(20.0);
             }
         } else {
             self.accelleration = 0.0;
@@ -68,7 +68,8 @@ impl BpmController {
     }
 
     pub fn get_bpm(&self) -> f64 {
-        self.bpm + self.temp_bpm_offset
+        let bpm = self.bpm + self.temp_bpm_offset;
+        bpm
     }
 
     pub fn get_reset(&mut self) -> bool {

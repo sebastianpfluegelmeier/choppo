@@ -377,7 +377,7 @@ fn slice_clip(clip: &mut ReducedClip, from: &Option<Time>, to: &Option<Time>) {
     if let Some(to) = to {
         clip.commands
             .retain(|c| time_to_frac(&c.0) < time_to_frac(to));
-        clip.length = to.clone();
+        clip.length = to - from;
     }
 }
 
@@ -624,7 +624,7 @@ fn reduce_number_beat_expression(expression: &NumberBeatExpression) -> ReducedBe
     ReducedBeat {
         beats,
         length: Time {
-            num: length - 1,
+            num: length,
             denom: 16,
         },
     }

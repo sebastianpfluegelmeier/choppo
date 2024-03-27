@@ -18,7 +18,7 @@ pub fn time_to_frac(time: &Time) -> fraction::prelude::GenericFraction<u64> {
 
 pub fn time_expression_to_time(time_expression: &TimeExpression) -> Time {
     Time {
-        num: (time_expression.beat * 4 + time_expression.sixteenth.unwrap_or(0)) as isize,
+        num: (time_expression.beat * 4 - 1 + time_expression.sixteenth.unwrap_or(0) - 1) as isize,
         denom: 16,
     }
 }
