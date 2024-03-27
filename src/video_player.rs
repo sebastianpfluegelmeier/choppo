@@ -1,13 +1,10 @@
+use std::time::Duration;
 
-
-use std::time::{Duration};
-
-use crate::bpm_controller::{BpmController};
+use crate::bpm_controller::BpmController;
 use crate::interpreter::{self, Interpreter};
 use crate::source_watcher::SourceWatcher;
-use crate::time_controller::{TimeController};
+use crate::time_controller::TimeController;
 use crate::video_loader::VideoLoader;
-
 
 use sdl2::keyboard::Keycode;
 
@@ -75,7 +72,7 @@ pub fn play_video(
                 layer += 1;
             }
             canvas.present();
-        } 
+        }
 
         for event in event_pump.poll_iter() {
             match event {

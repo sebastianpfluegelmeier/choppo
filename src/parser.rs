@@ -173,10 +173,7 @@ pub fn parse_empty_expression(input: &str) -> IResult<&str, ClipExpression> {
     let (input, _) = tag("-")(input)?;
     let (input, _) = multispace0(input)?;
 
-    Ok((
-        input,
-        ClipExpression::Empty,
-    ))
+    Ok((input, ClipExpression::Empty))
 }
 
 #[derive(Debug, Clone)]

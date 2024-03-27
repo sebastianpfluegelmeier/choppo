@@ -4,22 +4,22 @@ use crate::interpreter::Interpreter;
 use crate::source_watcher::SourceWatcher;
 
 use bpm_controller::BpmController;
-use std::{env};
+use std::env;
 use video_player::play_video;
 
+mod bpm_controller;
 mod interpreter;
 mod parser;
 mod reducer;
 mod source_watcher;
+mod time_controller;
 mod util;
 mod video_loader;
 mod video_player;
 mod video_reader;
-mod bpm_controller;
-mod time_controller;
 
 #[tokio::main]
-async fn main() -> Result<(), ffmpeg::Error>{
+async fn main() -> Result<(), ffmpeg::Error> {
     let bpm_controller = BpmController::new(120.0);
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {

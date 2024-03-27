@@ -1,4 +1,7 @@
-use std::{thread::sleep, time::{Duration, Instant}};
+use std::{
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 // TODO: fix this, somethings fucked here
 
@@ -10,14 +13,21 @@ pub struct TimeController {
 }
 
 impl TimeController {
-    pub fn new (fps: f64) -> Self {
-        Self { frame_start_time: Instant::now(), last_frame_start_time: Instant::now(), overtime: Duration::ZERO, fps }
+    pub fn new(fps: f64) -> Self {
+        Self {
+            frame_start_time: Instant::now(),
+            last_frame_start_time: Instant::now(),
+            overtime: Duration::ZERO,
+            fps,
+        }
     }
 
     pub fn frame_start(&mut self) {
         self.last_frame_start_time = self.frame_start_time;
         self.frame_start_time = Instant::now();
-        let last_frame_duration = self.frame_start_time.duration_since(self.last_frame_start_time);
+        let last_frame_duration = self
+            .frame_start_time
+            .duration_since(self.last_frame_start_time);
         let mut sleep_time = Duration::ZERO;
         if last_frame_duration < self.frame_duration() {
             sleep_time += self.frame_duration() - last_frame_duration;
@@ -37,7 +47,6 @@ impl TimeController {
     }
 
     fn frame_duration(&self) -> Duration {
-        Duration::from_secs_f64(1.0/self.fps)
+        Duration::from_secs_f64(1.0 / self.fps)
     }
 }
-

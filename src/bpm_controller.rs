@@ -1,6 +1,5 @@
 use sdl2::{event::Event, keyboard::Keycode};
 
-
 pub struct BpmController {
     bpm: f64,
     temp_bpm_offset: f64,
@@ -36,7 +35,7 @@ impl BpmController {
             down: false,
             reset: false,
             quit: false,
-            accelleration: 0.0
+            accelleration: 0.0,
         }
     }
 
@@ -64,11 +63,9 @@ impl BpmController {
             self.accelleration = 0.0;
             self.temp_bpm_offset = 0.0;
         }
-
     }
 
     pub fn get_bpm(&self) -> f64 {
-        
         self.bpm + self.temp_bpm_offset
     }
 
@@ -84,28 +81,79 @@ impl BpmController {
 
     pub fn consume_event(&mut self, event: &Event) {
         match event {
-            Event::KeyDown{ keycode: Some(Keycode::LAlt), ..} => self.option = true,
-            Event::KeyUp{keycode: Some(Keycode::LAlt), ..} => self.option = false,
-            Event::KeyDown{ keycode: Some(Keycode::LCtrl), ..} => self.ctrl = true,
-            Event::KeyUp{keycode: Some(Keycode::LCtrl), ..} => self.ctrl = false,
-            Event::KeyDown{ keycode: Some(Keycode::LGui), ..} => self.command = true,
-            Event::KeyUp{keycode: Some(Keycode::LGui), ..} => self.command = false,
-            Event::KeyDown{ keycode: Some(Keycode::Left), ..} => self.left = true,
-            Event::KeyUp{keycode: Some(Keycode::Left), ..} => self.left = false,
-            Event::KeyDown{ keycode: Some(Keycode::Right), ..} => self.right = true,
-            Event::KeyUp{keycode: Some(Keycode::Right), ..} => self.right = false,
-            Event::KeyDown{ keycode: Some(Keycode::Up), ..} => self.up = true,
-            Event::KeyUp{keycode: Some(Keycode::Up), ..} => self.up = false,
-            Event::KeyDown{ keycode: Some(Keycode::Down), ..} => self.down = true,
-            Event::KeyUp{keycode: Some(Keycode::Down), ..} => self.down = false,
-            Event::KeyDown{ keycode: Some(Keycode::R), ..} => self.bpm = self.bpm.round(),
-            Event::KeyDown{ keycode: Some(Keycode::Space), ..} => {
+            Event::KeyDown {
+                keycode: Some(Keycode::LAlt),
+                ..
+            } => self.option = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::LAlt),
+                ..
+            } => self.option = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::LCtrl),
+                ..
+            } => self.ctrl = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::LCtrl),
+                ..
+            } => self.ctrl = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::LGui),
+                ..
+            } => self.command = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::LGui),
+                ..
+            } => self.command = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::Left),
+                ..
+            } => self.left = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::Left),
+                ..
+            } => self.left = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::Right),
+                ..
+            } => self.right = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::Right),
+                ..
+            } => self.right = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::Up),
+                ..
+            } => self.up = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::Up),
+                ..
+            } => self.up = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::Down),
+                ..
+            } => self.down = true,
+            Event::KeyUp {
+                keycode: Some(Keycode::Down),
+                ..
+            } => self.down = false,
+            Event::KeyDown {
+                keycode: Some(Keycode::R),
+                ..
+            } => self.bpm = self.bpm.round(),
+            Event::KeyDown {
+                keycode: Some(Keycode::Space),
+                ..
+            } => {
                 self.reset = true;
             }
-            Event::KeyDown{keycode: Some(Keycode::X), ..} => {
+            Event::KeyDown {
+                keycode: Some(Keycode::X),
+                ..
+            } => {
                 self.quit = true;
             }
-            _ => ()
+            _ => (),
         }
     }
 }

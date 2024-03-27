@@ -13,14 +13,18 @@ use std::{
 pub struct SourceWatcher {
     receiver: Receiver<ReducedClip>,
     handle: JoinHandle<()>,
-    path: String
+    path: String,
 }
 
 impl SourceWatcher {
     pub fn new(path: String) -> Self {
         let (_sender, receiver) = channel();
-        let handle = thread::spawn(||{});
-        Self { receiver, handle, path}
+        let handle = thread::spawn(|| {});
+        Self {
+            receiver,
+            handle,
+            path,
+        }
     }
 
     pub fn get_new_interpreted(&mut self) -> Option<ReducedClip> {
