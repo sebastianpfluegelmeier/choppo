@@ -346,6 +346,7 @@ fn reduce_truncate_expression(
     );
     let from = timerange.from.as_ref().map(time_expression_to_time);
     let to = timerange.to.as_ref().map(time_expression_to_time);
+    println!("from {:?}, to {:?}", from, to);
     slice_clip(&mut clip, &from, &to);
     (clip, reduced_clips)
 }

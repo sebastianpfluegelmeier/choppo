@@ -2,6 +2,7 @@ extern crate ffmpeg_next as ffmpeg;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
+use std::time::Duration;
 
 use ffmpeg::ffi::{avformat_seek_file, AVSEEK_FLAG_FRAME};
 use ffmpeg::format::{input, Pixel};
@@ -105,13 +106,14 @@ impl VideoReader {
 
     pub fn read_next_frame(&mut self) -> Option<Video> {
         let _ = self.sender.send(ToVideoThread::LoadFrame);
-        loop {
+        for _ in 0..50 {
             for (_frame, video) in self.receiver.try_iter() {
                 self.buffer.push(video);
             }
             if !self.buffer.is_empty() {
                 break;
             }
+            thread::sleep(Duration::from_secs_f64(0.001))
         }
         if let Some(frame) = self.buffer.pop() {
             let mut rgb_frame = Video::empty();

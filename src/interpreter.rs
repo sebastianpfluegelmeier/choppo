@@ -1,4 +1,6 @@
 use crate::reducer::{ClipCommand, Time};
+use std::io::{stdout, Write};
+use std::process::Command;
 
 pub struct Interpreter {
     fps: f64,
@@ -51,7 +53,7 @@ impl Interpreter {
     }
 
     pub fn reset_beat(&mut self) {
-        self.beats = 0.0;
+        self.beats = 0.0001;
         self.time = 0.0;
         self.display_state.clear();
         self.commands_idx = 0;
@@ -147,7 +149,15 @@ impl Interpreter {
         }
 
         self.time += seconds;
+        let old_beats = self.beats;
         self.beats += self.bpm * seconds / (self.fps * 4.0);
+        if (self.beats * 4.0) as usize != (old_beats * 4.0) as usize || self.beats == 0.0 {
+            // Play a beep sound
+            print!("\x07");
+            let _ = stdout().flush();
+            println!("{}", (self.beats * 4.0));
+        }
+
         for display_state in &mut self.display_state {
             match display_state {
                 DisplayState::None => (),

@@ -21,8 +21,8 @@ pub fn play_video(
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let target_w = 1920 / 2;
-    let target_h = 1080 / 2;
+    let target_w = 1920*2/3;
+    let target_h = 1080*2/3;
 
     let window = video_subsystem
         .window("visuals", target_w, target_h)
@@ -72,6 +72,8 @@ pub fn play_video(
                 layer += 1;
             }
             canvas.present();
+        } else {
+            println!("skip frame");
         }
 
         for event in event_pump.poll_iter() {

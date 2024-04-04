@@ -1,3 +1,9 @@
-directory = '/Users/sebastianpfluegelmeier/test/';
-extension = '.mp4';
-'b'[14:15]*4|'a'[8:13]|'heahno'
+directory = '/Users/sebastianpfluegelmeier/visual_vids/';
+extension = '.mov_.mov';
+clip a = 'conc0';
+clip b = 'conc1';
+clip c = 'conc2';
+clip d = 'conc3';
+clip main = a | b | a | b | a | b | a | b;
+
+main
